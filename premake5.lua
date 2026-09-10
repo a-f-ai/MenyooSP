@@ -45,10 +45,11 @@ project "Menyoo"
         "Solution/external/ImGuizmo",
         "Solution/external/d3dhook",
         "Solution/external/MinHook/include",
+        "Solution/external/cpp-httplib",
         "Solution/generated",
     }
 
-    links { "ScriptHookV", "d3d11", "d3dcompiler", "dxgi", "Psapi" }
+    links { "ScriptHookV", "d3d11", "d3dcompiler", "dxgi", "Psapi", "ws2_32" }
 
     libdirs {
         "Solution/external/ScriptHookV/SDK/lib",

@@ -14,6 +14,7 @@
 #include "Menu.h"
 #include "MenuConfig.h"
 #include "../Submenus/Spooner/ImGuiSpooner.h"
+#include "..\Http\HttpServer.h"
 
 #include "..\Util\FileLogger.h"
 #include "..\Util\ExePath.h"
@@ -233,6 +234,7 @@ inline void MenyooMain()
 		if (loop_neon_flash == 2 || loop_neon_flash == 3) TickNeonSpinAnim();
 		if (loop_neon_flash == 4)  TickNeonFwkAnim();
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
+		Http::Server::DrainCommands();
 		WAIT(0);
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - looping");
@@ -252,6 +254,9 @@ void ThreadMenyooMain()
 			return 0;
 		}, NULL, 0, NULL);
 	}
+
+	addlog(ige::LogType::LOG_TRACE, "Starting HTTP bridge");
+	Http::Server::Start();
 
 	addlog(ige::LogType::LOG_TRACE, "Launching MenyooMain");
 	MenyooMain();
