@@ -9,6 +9,7 @@
 
 #include "HttpServer.h"
 
+#include "ApiError.h"
 #include "CommandQueue.h"
 #include "EntityApi.h"
 
@@ -18,7 +19,9 @@
 #include <json/single_include/nlohmann/json.hpp>
 
 #include <cmath>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 
@@ -36,8 +39,10 @@ namespace Http::Server
 		std::thread g_thread;
 
 		// ---------------------------------------------------------------
-		// Request validation. Anything missing or malformed is a 400 that
-		// names the field, so a caller can correct itself without guessing.
+		// Request validation, all of it on the HTTP thread. Anything missing
+		// or malformed is a 400 naming the field, so a caller can correct
+		// itself without guessing. Throwing here is safe; throwing on the
+		// fiber is not (see ApiError.h).
 		// ---------------------------------------------------------------
 
 		const json& Field(const json& body, const char* name)
@@ -60,25 +65,23 @@ namespace Http::Server
 			return static_cast<float>(raw);
 		}
 
-		float OptionalNumber(const json& body, const char* name, float fallbackValue)
+		float OptionalNumber(const json& body, const char* name, float whenAbsent)
 		{
-			// Absent rotation axes mean "no rotation on this axis", which is a
-			// meaningful value rather than a hidden default for missing data.
-			return body.contains(name) ? Number(body, name) : fallbackValue;
+			return body.contains(name) ? Number(body, name) : whenAbsent;
 		}
 
-		bool OptionalBool(const json& body, const char* name, bool fallbackValue)
+		bool OptionalBool(const json& body, const char* name, bool whenAbsent)
 		{
 			if (!body.contains(name))
-				return fallbackValue;
+				return whenAbsent;
 			const json& value = body.at(name);
 			if (!value.is_boolean())
 				throw ApiError(400, std::string("field \"") + name + "\" must be a boolean");
 			return value.get<bool>();
 		}
 
-		// Accepts "a_m_y_beach_01", "0xCADD5D2D" or 3403212... — all three are
-		// how the community writes models, and all three appear in map XML.
+		// Accepts "a_m_y_beach_01", "0xCADD5D2D" or a decimal hash. All three
+		// are how the community writes models, and all three appear in map XML.
 		unsigned long ParseModel(const json& body)
 		{
 			const json& value = Field(body, "model");
@@ -93,8 +96,7 @@ namespace Http::Server
 			if (raw.empty())
 				throw ApiError(400, "field \"model\" must not be empty");
 
-			const bool looksHex = raw.size() > 2 && raw[0] == '0' && (raw[1] == 'x' || raw[1] == 'X');
-			if (looksHex)
+			if (raw.size() > 2 && raw[0] == '0' && (raw[1] == 'x' || raw[1] == 'X'))
 			{
 				try
 				{
@@ -133,36 +135,27 @@ namespace Http::Server
 			throw ApiError(400, "field \"type\" must be \"ped\", \"vehicle\" or \"prop\", got \"" + raw + "\"");
 		}
 
-		EntityApi::Transform ParseTransform(const json& body, bool positionRequired)
+		EntityApi::Vec3 ParsePosition(const json& body)
 		{
-			EntityApi::Transform transform{};
+			const json& position = Field(body, "position");
+			if (!position.is_object())
+				throw ApiError(400, "field \"position\" must be an object with x, y and z");
+			return EntityApi::Vec3{
+				Number(position, "x"),
+				Number(position, "y"),
+				Number(position, "z"),
+			};
+		}
 
-			const auto position = body.find("position");
-			if (position == body.end())
-			{
-				if (positionRequired)
-					throw ApiError(400, "missing required field \"position\"");
-			}
-			else
-			{
-				if (!position->is_object())
-					throw ApiError(400, "field \"position\" must be an object with x, y and z");
-				transform.x = Number(*position, "x");
-				transform.y = Number(*position, "y");
-				transform.z = Number(*position, "z");
-			}
-
-			const auto rotation = body.find("rotation");
-			if (rotation != body.end())
-			{
-				if (!rotation->is_object())
-					throw ApiError(400, "field \"rotation\" must be an object with pitch, roll and yaw");
-				transform.pitch = OptionalNumber(*rotation, "pitch", 0.0f);
-				transform.roll = OptionalNumber(*rotation, "roll", 0.0f);
-				transform.yaw = OptionalNumber(*rotation, "yaw", 0.0f);
-			}
-
-			return transform;
+		EntityApi::Vec3 ParseRotation(const json& rotation)
+		{
+			if (!rotation.is_object())
+				throw ApiError(400, "field \"rotation\" must be an object with pitch, roll and yaw");
+			return EntityApi::Vec3{
+				OptionalNumber(rotation, "pitch", 0.0f),
+				OptionalNumber(rotation, "roll", 0.0f),
+				OptionalNumber(rotation, "yaw", 0.0f),
+			};
 		}
 
 		int ParseId(const std::string& raw)
@@ -197,73 +190,19 @@ namespace Http::Server
 		void Write(httplib::Response& response, int status, const json& payload)
 		{
 			response.status = status;
-			response.set_content(payload.dump(2), "application/json");
+			response.set_content(payload.dump(2, ' ', false, json::error_handler_t::replace),
+				"application/json");
 		}
 
-		// Parses and validates on the HTTP thread, then runs `work` on the
-		// fiber. Validation errors never reach the game thread.
+		// Validates on this thread, then runs the already-typed work on the
+		// fiber. `plan` returns the fiber-side call; validation failures never
+		// reach the game thread.
 		void Handle(const httplib::Request& request, httplib::Response& response,
-			const std::function<json(const httplib::Request&)>& prepare)
+			const std::function<std::function<Response()>(const httplib::Request&)>& plan)
 		{
 			try
 			{
-				// `prepare` closes over the parsed request and returns the
-				// fiber-side work as a deferred call.
-				json parsed = prepare(request);
-				const Response result = Queue().Submit([parsed]() -> Response {
-					// Dispatch happens inside the fiber so natives are legal.
-					const std::string& action = parsed.at("__action").get_ref<const std::string&>();
-					json payload;
-					int status = 200;
-
-					if (action == "list")
-					{
-						payload = EntityApi::ListEntities();
-					}
-					else if (action == "get")
-					{
-						payload = EntityApi::GetEntity(parsed.at("id").get<int>());
-					}
-					else if (action == "create")
-					{
-						EntityApi::CreateRequest create{};
-						create.type = parsed.at("type").get<int>();
-						create.model = parsed.at("model").get<unsigned long>();
-						create.name = parsed.at("name").get<std::string>();
-						create.dynamic = parsed.at("dynamic").get<bool>();
-						create.placeOnGround = parsed.at("placeOnGround").get<bool>();
-						create.transform.x = parsed.at("x").get<float>();
-						create.transform.y = parsed.at("y").get<float>();
-						create.transform.z = parsed.at("z").get<float>();
-						create.transform.pitch = parsed.at("pitch").get<float>();
-						create.transform.roll = parsed.at("roll").get<float>();
-						create.transform.yaw = parsed.at("yaw").get<float>();
-						payload = EntityApi::CreateEntity(create);
-						status = 201;
-					}
-					else if (action == "transform")
-					{
-						EntityApi::Transform transform{};
-						transform.x = parsed.at("x").get<float>();
-						transform.y = parsed.at("y").get<float>();
-						transform.z = parsed.at("z").get<float>();
-						transform.pitch = parsed.at("pitch").get<float>();
-						transform.roll = parsed.at("roll").get<float>();
-						transform.yaw = parsed.at("yaw").get<float>();
-						payload = EntityApi::SetTransform(parsed.at("id").get<int>(), transform);
-					}
-					else if (action == "delete")
-					{
-						payload = EntityApi::DeleteEntity(parsed.at("id").get<int>());
-					}
-					else
-					{
-						throw ApiError(500, "unrouted action \"" + action + "\"");
-					}
-
-					return Response{ status, payload.dump(2) };
-				});
-
+				const Response result = Queue().Submit(plan(request));
 				response.status = result.status;
 				response.set_content(result.body, "application/json");
 			}
@@ -326,30 +265,33 @@ namespace Http::Server
 
 			server.Get("/entities", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request&) {
-					return json{ { "__action", "list" } };
+					return std::function<Response()>([] { return EntityApi::ListEntities(); });
 				});
 			});
 
 			server.Post("/entities", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request& req) {
 					const json body = ParseBody(req);
-					const EntityApi::Transform transform = ParseTransform(body, true);
-					return json{
-						{ "__action", "create" },
-						{ "type", ParseType(body) },
-						{ "model", ParseModel(body) },
-						{ "name", body.contains("name") ? body.at("name").get<std::string>() : std::string() },
-						{ "dynamic", OptionalBool(body, "dynamic", false) },
-						{ "placeOnGround", OptionalBool(body, "placeOnGround", false) },
-						{ "x", transform.x }, { "y", transform.y }, { "z", transform.z },
-						{ "pitch", transform.pitch }, { "roll", transform.roll }, { "yaw", transform.yaw },
-					};
+
+					EntityApi::CreateRequest create{};
+					create.type = ParseType(body);
+					create.model = ParseModel(body);
+					create.name = body.contains("name") ? body.at("name").get<std::string>() : std::string();
+					create.position = ParsePosition(body);
+					create.rotation = body.contains("rotation")
+						? ParseRotation(body.at("rotation"))
+						: EntityApi::Vec3{ 0.0f, 0.0f, 0.0f };
+					create.dynamic = OptionalBool(body, "dynamic", false);
+					create.placeOnGround = OptionalBool(body, "placeOnGround", false);
+
+					return std::function<Response()>([create] { return EntityApi::CreateEntity(create); });
 				});
 			});
 
 			server.Get(R"(/entities/(-?\d+))", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request& req) {
-					return json{ { "__action", "get" }, { "id", ParseId(req.matches[1]) } };
+					const int id = ParseId(req.matches[1]);
+					return std::function<Response()>([id] { return EntityApi::GetEntity(id); });
 				});
 			});
 
@@ -360,54 +302,20 @@ namespace Http::Server
 					if (!body.contains("position") && !body.contains("rotation"))
 						throw ApiError(400, "provide at least one of \"position\" or \"rotation\"");
 
-					// A PATCH that omits one of them must not reset it, so read
-					// the current transform on the fiber and overlay the change.
-					const json current = json{ { "__action", "get" }, { "id", id } };
-					const Response existing = Queue().Submit([current]() -> Response {
-						return Response{ 200, EntityApi::GetEntity(current.at("id").get<int>()).dump() };
-					});
-					if (existing.status != 200)
-						throw ApiError(existing.status, json::parse(existing.body).at("error").get<std::string>());
-
-					const json entity = json::parse(existing.body);
-					EntityApi::Transform transform{};
-					transform.x = entity.at("position").at("x").get<float>();
-					transform.y = entity.at("position").at("y").get<float>();
-					transform.z = entity.at("position").at("z").get<float>();
-					transform.pitch = entity.at("rotation").at("pitch").get<float>();
-					transform.roll = entity.at("rotation").at("roll").get<float>();
-					transform.yaw = entity.at("rotation").at("yaw").get<float>();
-
+					EntityApi::PatchRequest patch{};
 					if (body.contains("position"))
-					{
-						const json& position = body.at("position");
-						if (!position.is_object())
-							throw ApiError(400, "field \"position\" must be an object with x, y and z");
-						transform.x = Number(position, "x");
-						transform.y = Number(position, "y");
-						transform.z = Number(position, "z");
-					}
+						patch.position = ParsePosition(body);
 					if (body.contains("rotation"))
-					{
-						const json& rotation = body.at("rotation");
-						if (!rotation.is_object())
-							throw ApiError(400, "field \"rotation\" must be an object with pitch, roll and yaw");
-						transform.pitch = OptionalNumber(rotation, "pitch", transform.pitch);
-						transform.roll = OptionalNumber(rotation, "roll", transform.roll);
-						transform.yaw = OptionalNumber(rotation, "yaw", transform.yaw);
-					}
+						patch.rotation = ParseRotation(body.at("rotation"));
 
-					return json{
-						{ "__action", "transform" }, { "id", id },
-						{ "x", transform.x }, { "y", transform.y }, { "z", transform.z },
-						{ "pitch", transform.pitch }, { "roll", transform.roll }, { "yaw", transform.yaw },
-					};
+					return std::function<Response()>([id, patch] { return EntityApi::PatchEntity(id, patch); });
 				});
 			});
 
 			server.Delete(R"(/entities/(-?\d+))", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request& req) {
-					return json{ { "__action", "delete" }, { "id", ParseId(req.matches[1]) } };
+					const int id = ParseId(req.matches[1]);
+					return std::function<Response()>([id] { return EntityApi::DeleteEntity(id); });
 				});
 			});
 

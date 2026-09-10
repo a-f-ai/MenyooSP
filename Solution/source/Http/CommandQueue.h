@@ -24,23 +24,9 @@ namespace Http
 		std::string body;
 	};
 
-	// Thrown by handler code to answer with a specific status. Anything else
-	// that escapes a handler becomes a 500 naming the exception.
-	class ApiError : public std::exception
-	{
-	public:
-		ApiError(int status, std::string message);
-
-		int Status() const noexcept;
-		const char* what() const noexcept override;
-
-	private:
-		int m_status;
-		std::string m_message;
-	};
-
 	struct Command
 	{
+		// Runs on the fiber. Must not throw: see ApiError.h.
 		std::function<Response()> run;
 		std::promise<Response> result;
 	};

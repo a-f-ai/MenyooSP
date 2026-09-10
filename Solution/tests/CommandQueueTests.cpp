@@ -70,47 +70,19 @@ namespace
 		Check(queue.Depth() == 0, "the queue is empty after draining");
 	}
 
-	// An ApiError thrown inside a command becomes its status, and never
-	// escapes into the draining (game) thread.
-	void ApiErrorsBecomeStatusCodes()
+	// Commands must report failure by returning a status, because an
+	// exception raised on the ScriptHookV fiber kills the script no matter
+	// who catches it. Drain deliberately has no handler, so this test pins
+	// the contract: a returned failure travels back intact.
+	void FailureStatusesTravelBackAsValues()
 	{
-		std::printf("ApiError inside a command becomes a status code\n");
+		std::printf("a command reports failure by returning a status\n");
 		Http::CommandQueue queue(64, 2000ms);
 
 		Http::Response result{};
 		std::thread submitter([&] {
 			result = queue.Submit([]() -> Http::Response {
-				throw Http::ApiError(422, "model not installed");
-			});
-		});
-
-		std::this_thread::sleep_for(50ms);
-		bool drainThrew = false;
-		try
-		{
-			queue.Drain();
-		}
-		catch (...)
-		{
-			drainThrew = true;
-		}
-		submitter.join();
-
-		Check(!drainThrew, "Drain does not let the exception reach the game thread");
-		Check(result.status == 422, "the ApiError status is preserved");
-		Check(result.body.find("model not installed") != std::string::npos,
-			"the ApiError message reaches the caller");
-	}
-
-	void UnexpectedExceptionsBecome500()
-	{
-		std::printf("an unexpected exception becomes a 500\n");
-		Http::CommandQueue queue(64, 2000ms);
-
-		Http::Response result{};
-		std::thread submitter([&] {
-			result = queue.Submit([]() -> Http::Response {
-				throw std::runtime_error("something in the engine broke");
+				return Http::Response{ 422, R"({"error":"model not installed"})" };
 			});
 		});
 
@@ -118,9 +90,9 @@ namespace
 		queue.Drain();
 		submitter.join();
 
-		Check(result.status == 500, "unexpected failures report 500");
-		Check(result.body.find("something in the engine broke") != std::string::npos,
-			"the original message is not swallowed");
+		Check(result.status == 422, "the failure status is preserved");
+		Check(result.body.find("model not installed") != std::string::npos,
+			"the failure message reaches the caller");
 	}
 
 	// A game thread that never ticks must not hold connections open.
@@ -234,8 +206,7 @@ namespace
 int main()
 {
 	SubmittedWorkRunsOnTheDrainingThread();
-	ApiErrorsBecomeStatusCodes();
-	UnexpectedExceptionsBecome500();
+	FailureStatusesTravelBackAsValues();
 	ABlockedGameThreadTimesOut();
 	AFullQueueIsRejected();
 	StopReleasesWaitingCallers();
