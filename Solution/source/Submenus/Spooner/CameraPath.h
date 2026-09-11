@@ -69,7 +69,10 @@ namespace sub::Spooner::CameraPaths
 		Vector3 position;
 		Vector3 rotation;             // degrees, pitch/roll/yaw as Menyoo stores them
 		float fov = 50.0f;
-		Easing easing = Easing::InOutSine;  // shapes the segment that starts here
+		// Linear by default: a curve that runs 0 to 1 inside one segment brings
+		// the camera to a halt at both of its ends, so easing every key turns a
+		// flythrough into a series of stops. Ease the ends of the path instead.
+		Easing easing = Easing::Linear;     // shapes the segment that starts here
 	};
 
 	struct CameraPose
@@ -84,7 +87,7 @@ namespace sub::Spooner::CameraPaths
 	public:
 		std::string name = "untitled";
 		bool loop = false;
-		Smoothing smoothing = Smoothing::WholePath;
+		Smoothing smoothing = Smoothing::PerKey;
 		Easing pathEasing = Easing::InOutSine;
 		// Spreads progress by distance travelled rather than by spline
 		// parameter, so a long segment does not race a short one.
@@ -121,6 +124,15 @@ namespace sub::Spooner::CameraPaths
 
 		// Scales the whole path so it lasts `seconds`.
 		void SetTotalDuration(float seconds);
+
+		// Redistributes key times in proportion to how far the camera actually
+		// travels between them, keeping the start and the total length. This is
+		// what makes speed even without giving up per-key control of it.
+		void RetimeByArcLength();
+
+		// Accelerate out of the first key, settle into the last, and hold a
+		// steady pace in between.
+		void EaseEnds();
 
 		// Moves every key at or after `fromTime` by `delta`, which is how an
 		// insert makes room for itself instead of overwriting what follows.

@@ -356,6 +356,61 @@ namespace
 			std::to_string(path.Duration()));
 	}
 
+
+	// The everyday complaint is uneven speed, and retiming by distance is the
+	// fix that keeps every key where the user put it in space.
+	void RetimingByArcLengthEvensOutSpeed()
+	{
+		std::printf("retiming by arc length evens out speed\n");
+		CameraPath path;
+		path.smoothing = Smoothing::PerKey;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(1.0f, 90.0f, 0.0f, 0.0f));   // a long leg in one second
+		path.AddKey(Key(2.0f, 100.0f, 0.0f, 0.0f));  // a short one in another
+		path.RetimeByArcLength();
+
+		Check(Near(path.keys.front().time, 0.0f), "the path still starts where it did");
+		Check(Near(path.Duration(), 2.0f), "and still lasts as long");
+		// The middle key should now sit at roughly 90% of the way through.
+		Check(path.keys[1].time > 1.5f,
+			std::string("the middle key moved to match the distance, now at ") +
+			std::to_string(path.keys[1].time));
+
+		// Speed either side of the middle key should now be comparable.
+		const float before = path.Evaluate(path.keys[1].time).position.x -
+			path.Evaluate(path.keys[1].time - 0.1f).position.x;
+		const float after = path.Evaluate(path.keys[1].time + 0.1f).position.x -
+			path.Evaluate(path.keys[1].time).position.x;
+		Check(std::fabs(before - after) < std::fabs(before) * 0.5f,
+			std::string("speed no longer jumps at the key: ") + std::to_string(before) +
+			" then " + std::to_string(after));
+	}
+
+	void EaseEndsShapesOnlyTheEnds()
+	{
+		std::printf("ease ends shapes only the first and last moves\n");
+		CameraPath path;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(1.0f, 10.0f, 0.0f, 0.0f));
+		path.AddKey(Key(2.0f, 20.0f, 0.0f, 0.0f));
+		path.AddKey(Key(3.0f, 30.0f, 0.0f, 0.0f));
+		path.EaseEnds();
+
+		Check(path.keys[0].easing == Easing::InSine, "the first move accelerates");
+		Check(path.keys[1].easing == Easing::Linear, "the middle runs at a steady pace");
+		Check(path.keys[2].easing == Easing::OutSine, "the last move settles");
+	}
+
+	void NewKeysAreLinearByDefault()
+	{
+		std::printf("a fresh key does not ease by itself\n");
+		CameraKey key;
+		Check(key.easing == Easing::Linear,
+			"easing every key would stop the camera at every one of them");
+		CameraPath path;
+		Check(path.smoothing == Smoothing::PerKey, "per-key control is the default");
+	}
+
 	void RemovingAKeyRebuilds()
 	{
 		std::printf("removing a key keeps the path usable\n");
@@ -391,6 +446,9 @@ int main()
 	ScalingStretchesTheTiming();
 	KeysKeepTheirIdentityAcrossEdits();
 	ClipboardRoundTrips();
+	RetimingByArcLengthEvensOutSpeed();
+	EaseEndsShapesOnlyTheEnds();
+	NewKeysAreLinearByDefault();
 
 	if (g_failures == 0)
 	{

@@ -508,6 +508,54 @@ namespace sub::Spooner::CameraPaths
 		return inserted;
 	}
 
+	void CameraPath::RetimeByArcLength()
+	{
+		if (keys.size() < 3)
+			return;
+
+		Rebuild();
+		std::vector<float> lengths(keys.size() - 1, 0.0f);
+		float total = 0.0f;
+		for (size_t segment = 0; segment + 1 < keys.size(); ++segment)
+		{
+			const float length = m_arcTables[segment].back();
+			lengths[segment] = length;
+			total += length;
+		}
+		if (total <= 1e-4f)
+			return;
+
+		const float start = keys.front().time;
+		const float duration = keys.back().time - start;
+		if (duration <= 1e-4f)
+			return;
+
+		float travelled = 0.0f;
+		for (size_t i = 1; i + 1 < keys.size(); ++i)
+		{
+			travelled += lengths[i - 1];
+			keys[i].time = start + duration * (travelled / total);
+		}
+		Rebuild();
+	}
+
+	void CameraPath::EaseEnds()
+	{
+		if (keys.size() < 2)
+			return;
+
+		for (CameraKey& key : keys)
+			key.easing = Easing::Linear;
+
+		if (keys.size() == 2)
+		{
+			keys.front().easing = Easing::InOutSine;
+			return;
+		}
+		keys.front().easing = Easing::InSine;                  // accelerate away
+		keys[keys.size() - 2].easing = Easing::OutSine;        // settle in
+	}
+
 	void CameraPath::SetTotalDuration(float seconds)
 	{
 		const float current = Duration();

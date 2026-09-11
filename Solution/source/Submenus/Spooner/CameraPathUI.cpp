@@ -337,15 +337,32 @@ namespace sub::Spooner::CameraPathUI
 
 		void DrawSmoothing(PlayerState& state)
 		{
-			int mode = state.path.smoothing == Smoothing::WholePath ? 0 : 1;
-			const char* modes[] = { "Whole path", "Per key" };
-			ImGui::SetNextItemWidth(130.0f);
-			if (ImGui::Combo("Smoothing", &mode, modes, 2))
-				state.path.smoothing = mode == 0 ? Smoothing::WholePath : Smoothing::PerKey;
+			// Two one-click fixes for the usual complaints, both of which leave
+			// every key exactly as controllable as before.
+			if (ImGui::Button("Even speed"))
+				state.path.RetimeByArcLength();
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Retime the keys by distance, so the camera stops "
+					"racing through long legs and crawling through short ones.\n"
+					"Start and total length are kept.");
+			ImGui::SameLine();
+			if (ImGui::Button("Ease ends"))
+				state.path.EaseEnds();
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("Accelerate out of the first key, settle into the last, "
+					"steady in between.\nThis is the smoothing you usually want.");
+
+			ImGui::SameLine();
+			bool global = state.path.smoothing == Smoothing::WholePath;
+			if (ImGui::Checkbox("Global smoothing", &global))
+				state.path.smoothing = global ? Smoothing::WholePath : Smoothing::PerKey;
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("One curve over the whole path instead of per-key easing.\n"
+					"Smooth, but it takes local control of pacing away.\n"
+					"Off by default; \"Ease ends\" usually does what you want.");
 
 			if (state.path.smoothing == Smoothing::WholePath)
 			{
-				ImGui::SameLine();
 				int easingIndex = static_cast<int>(state.path.pathEasing);
 				std::vector<const char*> names;
 				names.reserve(EasingCount());
@@ -354,11 +371,9 @@ namespace sub::Spooner::CameraPathUI
 				ImGui::SetNextItemWidth(150.0f);
 				if (ImGui::Combo("Curve", &easingIndex, names.data(), static_cast<int>(names.size())))
 					state.path.pathEasing = EasingFromIndex(easingIndex);
-			}
-			else
-			{
 				ImGui::SameLine();
-				ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.35f, 1.0f), "stops at every key");
+				ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.35f, 1.0f),
+					"one curve over everything, per-key easing ignored");
 			}
 		}
 

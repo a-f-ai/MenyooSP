@@ -165,7 +165,7 @@ namespace sub::Spooner::CameraPaths
 			key.position = authorPosition;
 			key.rotation = authorRotation;
 			key.fov = authorFov;
-			key.easing = Easing::InOutSine;
+			key.easing = Easing::Linear;
 			state.path.AddKey(key);
 			state.selectedKey = state.path.IndexOfId(state.path.keys.back().id);
 			state.selectedIds = { state.path.keys[state.selectedKey].id };
