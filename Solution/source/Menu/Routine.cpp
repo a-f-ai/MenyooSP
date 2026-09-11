@@ -16,6 +16,8 @@
 #include "../Submenus/Spooner/ImGuiSpooner.h"
 #include "..\Http\HttpServer.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Submenus\Spooner\SpoonerEntity.h"
+#include "..\Submenus\Spooner\SpoonerMode.h"
 #include "..\Submenus\Spooner\ImGuiSpooner.h"
 #include "..\Util\keyboard.h"
 
@@ -239,6 +241,8 @@ inline void MenyooMain()
 		if (loop_neon_flash == 2 || loop_neon_flash == 3) TickNeonSpinAnim();
 		if (loop_neon_flash == 4)  TickNeonFwkAnim();
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
+		if (IsKeyJustUp(BindBecomePed))
+			BecomeSelectedOrAimedPed();
 		if (IsKeyJustUp(BindCameraPath))
 			sub::Spooner::CameraPaths::ToggleWindow();
 		if (sub::Spooner::CameraPaths::IsWindowVisible())
@@ -609,6 +613,7 @@ INT16 BindCameraPathCursor = VirtualKey::F7;
 INT16 BindCameraPathAddKey = VirtualKey::OEM6;   // ]
 INT16 BindCameraPathPlay = VirtualKey::OEM4;     // [
 INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
+INT16 BindBecomePed = VirtualKey::F6;
 
 INT16 bind_no_clip = VirtualKey::F3;
 
@@ -1817,6 +1822,65 @@ void SetTriggerFXAtBulletHit(Ped ped, const std::string& fxAsset, const std::str
 	}
 
 	PTFX::TriggerPTFX(fxAsset, fxName, 0, Pos, Rot, scale);
+}
+
+// One key for what the menu does in several clicks: look at a ped, press it,
+// be that ped. Free aiming is checked first because it is the precise gesture,
+// then a ray straight out of the camera so merely looking is enough, and only
+// then the spooner's selection for when the camera is pointed elsewhere.
+void BecomeSelectedOrAimedPed()
+{
+	GTAentity target(0);
+	GTAentity myPed = PLAYER_PED_ID();
+
+	ScrHandle aimed;
+	if (GET_ENTITY_PLAYER_IS_FREE_AIMING_AT(PLAYER_ID(), &aimed))
+	{
+		GTAentity aimedEntity = aimed;
+		if (aimedEntity.IsPed())
+			target = aimedEntity;
+	}
+
+	if (!target.Exists())
+	{
+		Camera& spoonerCam = sub::Spooner::SpoonerMode::spoonerModeCamera;
+		const GTAentity looked = spoonerCam.IsActive()
+			? spoonerCam.RaycastForEntity(Vector2(0.0f, 0.0f), myPed, 120.0f)
+			: GameplayCamera::RaycastForEntity(Vector2(0.0f, 0.0f), myPed, 120.0f);
+		if (looked.Exists() && looked.IsPed())
+			target = looked;
+	}
+
+	if (!target.Exists())
+	{
+		const GTAentity& selected = sub::Spooner::selectedEntity.handle;
+		if (selected.Exists() && selected.IsPed())
+			target = selected;
+	}
+
+	if (!target.Exists())
+	{
+		Game::Print::PrintBottomLeft("~r~No ped:~s~ look at one, or select one in the spooner.");
+		return;
+	}
+	if (target == myPed)
+	{
+		Game::Print::PrintBottomLeft("~r~That is already you.");
+		return;
+	}
+	if (!target.IsAlive())
+	{
+		Game::Print::PrintBottomLeft("~r~That ped is dead.");
+		return;
+	}
+	if (NETWORK_IS_IN_SESSION())
+	{
+		Game::Print::PrintBottomLeft("~r~Soul-steal is single player only.");
+		return;
+	}
+
+	SetBecomePed(target);
+	Game::Print::PrintBottomLeft("~g~Became the selected ped.");
 }
 
 void SetBecomePed(GTAped ped)
