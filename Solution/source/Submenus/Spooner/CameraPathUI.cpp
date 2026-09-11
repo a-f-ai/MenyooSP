@@ -252,7 +252,7 @@ namespace sub::Spooner::CameraPathUI
 		else
 			ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.35f, 1.0f),
 				"Camera is yours. F7 to use the mouse here");
-		ImGui::TextDisabled("Insert add key at camera  |  Home play/pause  |  End stop  |  F10 hide");
+		ImGui::TextDisabled("]  add key at camera   [  play/pause   \\  stop   F10 hide");
 
 		ImGui::Separator();
 		ImGui::Text("%d keys, %.2f s", static_cast<int>(state.path.keys.size()), state.path.Duration());
@@ -261,7 +261,8 @@ namespace sub::Spooner::CameraPathUI
 		if (!state.spoonerCameraActive)
 		{
 			ImGui::SameLine();
-			ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "| gameplay camera");
+			ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
+				"| gameplay camera - press F9 to fly a free camera");
 		}
 
 		DrawTimeline(state);

@@ -596,9 +596,11 @@ void TickNeonFwkAnim()
 INT16 BindNoClip = VirtualKey::F3;
 INT16 BindCameraPath = VirtualKey::F10;
 INT16 BindCameraPathCursor = VirtualKey::F7;
-INT16 BindCameraPathAddKey = VirtualKey::Insert;
-INT16 BindCameraPathPlay = VirtualKey::Home;
-INT16 BindCameraPathStop = VirtualKey::End;
+// Bracket keys rather than Insert/Home/End: those three are missing from Mac
+// keyboards, which is where this gets used through CrossOver.
+INT16 BindCameraPathAddKey = VirtualKey::OEM6;   // ]
+INT16 BindCameraPathPlay = VirtualKey::OEM4;     // [
+INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
 
 INT16 bind_no_clip = VirtualKey::F3;
 
