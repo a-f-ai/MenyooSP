@@ -20,6 +20,8 @@
 #include "..\..\Util\GTAmath.h"
 #include "..\..\Natives\natives.h"
 #include "Submenus.h"
+#include "CameraPathUI.h"
+#include "CameraPathPlayer.h"
 
 namespace sub::Spooner::ImGuiSpooner
 {
@@ -386,10 +388,16 @@ namespace sub::Spooner::ImGuiSpooner
 		{
 			std::lock_guard<std::mutex> lock(g_Mutex);
 
-			ImGui::GetIO().MouseDrawCursor = g_Shared.editingState.mode == SpoonerMode::eEditMode::Gizmo && g_Shared.editingState.cameraLocked;
+			// The camera path window needs a pointer of its own, whatever the
+			// gizmo is doing.
+			ImGui::GetIO().MouseDrawCursor =
+				(g_Shared.editingState.mode == SpoonerMode::eEditMode::Gizmo && g_Shared.editingState.cameraLocked) ||
+				CameraPaths::IsWindowVisible();
 
 			RunGizmo_NoLock(g_Shared);
 		}
+
+		CameraPathUI::Draw();
 
 		ImGui::Render();
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -538,6 +546,10 @@ namespace sub::Spooner::ImGuiSpooner
 				g_Shared.gizmoOver ||
 				g_Shared.gizmoUsing);
 		}
+
+		// Dragging keys on the timeline must not also steer the player.
+		if (CameraPaths::IsWindowVisible())
+			suppressGameInput = true;
 
 		if (suppressGameInput)
 			PAD::DISABLE_ALL_CONTROL_ACTIONS(0);

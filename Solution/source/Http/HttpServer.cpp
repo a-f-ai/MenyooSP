@@ -10,6 +10,7 @@
 #include "HttpServer.h"
 
 #include "ApiError.h"
+#include "CameraApi.h"
 #include "CatalogApi.h"
 #include "CommandQueue.h"
 #include "EntityApi.h"
@@ -313,6 +314,15 @@ namespace Http::Server
 					"GET /catalog/scenarios?q=",
 					"GET /catalog/animations?q=&filter=<dict>",
 				}) },
+				{ "camera", json::array({
+					"GET    /camera/path        the current flythrough and where it is playing",
+					"PUT    /camera/path        {name?, loop?, constantSpeed?, keys:[{time, position:{x,y,z}, rotation?, fov?, easing?}]}",
+					"POST   /camera/keys        a key body, or empty to take one from the live camera",
+					"DELETE /camera/keys/{index}",
+					"POST   /camera/play | /camera/pause | /camera/stop | /camera/seek {time}",
+					"GET    /camera/paths       saved flythroughs in menyooStuff/CameraPaths",
+					"POST   /camera/paths/save | /camera/paths/load  {name}",
+				}) },
 				{ "maps", json::array({
 					"GET    /maps           what is in menyooStuff/Spooner",
 					"POST   /maps/save      {name} writes the spooner database as a Menyoo map XML",
@@ -547,6 +557,75 @@ namespace Http::Server
 				Handle(request, response, [](const httplib::Request&) {
 					return std::function<Response()>([] { return MapApi::ClearSpawned(); });
 				}, 30000ms);
+			});
+
+			// ---- camera paths ----
+			// These touch only mutex-guarded state, never a native, so they
+			// answer on this thread instead of waiting for a frame.
+
+			const auto direct = [](httplib::Response& response, const std::function<Response()>& work) {
+				try
+				{
+					const Response result = work();
+					response.status = result.status;
+					response.set_content(result.body, "application/json");
+				}
+				catch (const ApiError& error)
+				{
+					Write(response, error.Status(), json{ { "error", error.what() } });
+				}
+				catch (const std::exception& error)
+				{
+					Write(response, 500, json{ { "error", std::string("unhandled exception: ") + error.what() } });
+				}
+			};
+
+			server.Get("/camera/path", [direct](const httplib::Request&, httplib::Response& response) {
+				direct(response, [] { return CameraApi::GetPath(); });
+			});
+
+			server.Put("/camera/path", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] { return CameraApi::ReplacePath(ParseObjectBody(request)); });
+			});
+
+			server.Post("/camera/keys", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] {
+					const json body = request.body.empty() ? json::object() : ParseObjectBody(request);
+					return CameraApi::AppendKey(body);
+				});
+			});
+
+			server.Delete(R"(/camera/keys/(\d+))", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] { return CameraApi::DeleteKey(ParseId(request.matches[1])); });
+			});
+
+			server.Post(R"(/camera/(play|pause|stop|seek))", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] {
+					const std::string action = request.matches[1];
+					float time = 0.0f;
+					if (action == "seek")
+					{
+						const json body = request.body.empty() ? json::object() : ParseObjectBody(request);
+						time = Number(body, "time");
+					}
+					return CameraApi::Transport(action, time);
+				});
+			});
+
+			server.Get("/camera/paths", [direct](const httplib::Request&, httplib::Response& response) {
+				direct(response, [] { return CameraApi::ListSaved(); });
+			});
+
+			server.Post("/camera/paths/save", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] {
+					return CameraApi::SavePath(Field(ParseObjectBody(request), "name").get<std::string>());
+				});
+			});
+
+			server.Post("/camera/paths/load", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] {
+					return CameraApi::LoadPath(Field(ParseObjectBody(request), "name").get<std::string>());
+				});
 			});
 
 			// httplib calls this for every response with a status of 400 or

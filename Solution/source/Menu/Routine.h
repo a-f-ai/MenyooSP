@@ -58,6 +58,7 @@ void TickNeonFwkAnim();
 void TickNeonHeartbeatAnim();
 
 extern INT16 BindNoClip;
+extern INT16 BindCameraPath;
 extern RgbS g_fadedRGB, g_neonFade, g_neonSlide, g_neonHeart, g_neonShift;
 extern bool g_neonFlash;
 extern int g_neonSpin, g_neonSpinBack;

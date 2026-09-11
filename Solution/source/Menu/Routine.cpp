@@ -15,6 +15,8 @@
 #include "MenuConfig.h"
 #include "../Submenus/Spooner/ImGuiSpooner.h"
 #include "..\Http\HttpServer.h"
+#include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Util\keyboard.h"
 
 #include "..\Util\FileLogger.h"
 #include "..\Util\ExePath.h"
@@ -234,6 +236,9 @@ inline void MenyooMain()
 		if (loop_neon_flash == 2 || loop_neon_flash == 3) TickNeonSpinAnim();
 		if (loop_neon_flash == 4)  TickNeonFwkAnim();
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
+		if (IsKeyJustUp(BindCameraPath))
+			sub::Spooner::CameraPaths::ToggleWindow();
+		sub::Spooner::CameraPaths::Tick();
 		Http::Server::DrainCommands();
 		WAIT(0);
 		if (firstTick)
@@ -561,6 +566,7 @@ void TickNeonFwkAnim()
 // Global state variables
 
 INT16 BindNoClip = VirtualKey::F3;
+INT16 BindCameraPath = VirtualKey::F10;
 
 INT16 bind_no_clip = VirtualKey::F3;
 

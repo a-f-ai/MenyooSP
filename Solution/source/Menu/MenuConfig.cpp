@@ -104,6 +104,7 @@ void MenuConfig::ConfigRead()
 
 
 	BindNoClip = ini.GetLongValue(section_general.c_str(), "FreeCamButton", BindNoClip);
+	BindCameraPath = ini.GetLongValue(section_general.c_str(), "CameraPathButton", BindCameraPath);
 
 
 	std::string section_colours = "colours";/////////
@@ -368,6 +369,7 @@ void MenuConfig::SaveConfig()
 
 
 	ini.SetLongValue(section_general.c_str(), "FreeCamButton", BindNoClip);
+	ini.SetLongValue(section_general.c_str(), "CameraPathButton", BindCameraPath);
 
 
 	std::string section_colours = "colours";/////////
