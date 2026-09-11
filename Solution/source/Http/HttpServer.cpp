@@ -328,6 +328,8 @@ namespace Http::Server
 					"POST   /maps/save      {name} writes the spooner database as a Menyoo map XML",
 					"POST   /maps/load      {name} loads one (slow, fades the screen)",
 					"DELETE /maps/spawned   deletes everything the spooner owns",
+					"GET    /maps/names     reports entity names inflated by the old encoding bug",
+					"POST   /maps/names/repair  fixes them in place, keeping a .bak per map",
 				}) },
 				{ "statuses", json::array({
 					"207 a batch where some items failed; read \"failures\"",
@@ -551,6 +553,18 @@ namespace Http::Server
 					const std::string name = Field(ParseObjectBody(req), "name").get<std::string>();
 					return std::function<Response()>([name] { return MapApi::LoadMap(name); });
 				}, 120000ms);
+			});
+
+			server.Get("/maps/names", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request&) {
+					return std::function<Response()>([] { return MapApi::RepairNames(false); });
+				}, 30000ms);
+			});
+
+			server.Post("/maps/names/repair", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request&) {
+					return std::function<Response()>([] { return MapApi::RepairNames(true); });
+				}, 60000ms);
 			});
 
 			server.Delete("/maps/spawned", [](const httplib::Request& request, httplib::Response& response) {

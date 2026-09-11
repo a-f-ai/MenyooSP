@@ -16,4 +16,8 @@ namespace Http::MapApi
 	Response SaveMap(const std::string& name);
 	Response LoadMap(const std::string& name);
 	Response ClearSpawned();
+
+	// Names inflated by the old ISO-8859-1 declaration. apply=false reports
+	// without writing.
+	Response RepairNames(bool apply);
 }

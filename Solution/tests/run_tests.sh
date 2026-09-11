@@ -23,6 +23,19 @@ cp "$source_root/Submenus/Spooner/CameraPath.h" \
 cp "$here/CameraPathTests.cpp" "$build/Submenus/Spooner/"
 cp "$source_root/Util/GTAmath.h" "$source_root/Util/GTAmath.cpp" "$build/Util/"
 
+cp "$source_root/Submenus/Spooner/MapRepair.h" \
+   "$source_root/Submenus/Spooner/MapRepair.cpp" "$build/Submenus/Spooner/"
+cp "$here/MapRepairTests.cpp" "$build/Submenus/Spooner/"
+
+# MapRepair reaches the game's path helper for the Spooner directory; the tests
+# only exercise the decoding, so a stub is enough to link.
+cat > "$build/Util/ExePath.h" <<'STUB'
+#pragma once
+#include <string>
+enum class Pathff { Main, Spooner, Audio, Vehicle, Outfit };
+inline std::string GetPathffA(Pathff, bool) { return "./"; }
+STUB
+
 cat > "$build/Util/FileLogger.h" <<'STUB'
 #pragma once
 #include <cstdio>
@@ -33,6 +46,9 @@ inline void addlog(ige::LogType, const std::string& message)
     std::printf("       [log] %s\n", message.c_str());
 }
 STUB
+
+pugi_include="$source_root/../external"
+pugi_source="$source_root/../external/pugixml/src/pugixml.cpp"
 
 compiler="${CXX:-c++}"
 # Menyoo's own sources are not warning-clean under -Wall; the tests are about
@@ -45,6 +61,16 @@ echo "--- command queue ---"
     "$build/Http/CommandQueue.cpp" "$build/Http/CommandQueueTests.cpp" \
     -o "$build/queue_tests"
 "$build/queue_tests"
+
+echo
+echo "--- map name repair ---"
+"$compiler" "${flags[@]}" \
+    -I"$build/Submenus/Spooner" -I"$build" -I"$pugi_include" \
+    "$build/Submenus/Spooner/MapRepair.cpp" \
+    "$build/Submenus/Spooner/MapRepairTests.cpp" \
+    "$pugi_source" \
+    -o "$build/maprepair_tests"
+"$build/maprepair_tests"
 
 echo
 echo "--- camera path ---"

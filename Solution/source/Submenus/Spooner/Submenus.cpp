@@ -43,6 +43,7 @@
 #include "SpoonerSettings.h"
 #include "Databases.h"
 #include "FileManagement.h"
+#include "MapRepair.h"
 #include "EntityManagement.h"
 #include "MarkerManagement.h"
 #include "FavouritesManagement.h"
@@ -367,6 +368,22 @@ namespace sub
 			//OnscreenKeyboard::State::Set(OnscreenKeyboard::Purpose::SpoonerSaveDbToFile, std::string(), 28U, "Enter file name:");
 			//OnscreenKeyboard::State::arg1._ptr = reinterpret_cast<void*>(&_dir);
 		}
+
+			bool bCheckNames = false;
+			AddOption("Check Saved Maps For Bloated Names", bCheckNames); if (bCheckNames)
+			{
+				const auto report = MapRepair::ScanSavedMaps(false);
+				Game::Print::PrintBottomLeft(report.Summary());
+			}
+
+			bool bRepairNames = false;
+			AddOption("Repair Bloated Names (keeps .bak)", bRepairNames); if (bRepairNames)
+			{
+				const auto report = MapRepair::ScanSavedMaps(true);
+				Game::Print::PrintBottomLeft(report.Summary());
+				if (report.namesAffected > 0)
+					Game::Print::ShowNotification("~g~Maps repaired", report.Summary());
+			}
 
 			bool bSaveWorld = false;
 			AddOption("Save World To File (" + std::to_string(worldEntities.size()) + ")", bSaveWorld); if (bSaveWorld)

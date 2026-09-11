@@ -9,6 +9,7 @@
 #include "../Submenus/Spooner/Databases.h"
 #include "../Submenus/Spooner/EntityManagement.h"
 #include "../Submenus/Spooner/FileManagement.h"
+#include "../Submenus/Spooner/MapRepair.h"
 #include "../Submenus/Spooner/SpoonerEntity.h"
 
 #include <json/single_include/nlohmann/json.hpp>
@@ -119,6 +120,37 @@ namespace Http::MapApi
 		return Ok(json{
 			{ "loaded", name },
 			{ "entities", sub::Spooner::Databases::EntityDb.size() },
+		});
+	}
+
+	Response RepairNames(bool apply)
+	{
+		const auto report = sub::Spooner::MapRepair::ScanSavedMaps(apply);
+
+		json files = json::array();
+		for (const auto& file : report.affected)
+		{
+			json entry{
+				{ "map", file.name },
+				{ "names", file.namesAffected },
+				{ "recoversTo", file.sample },
+				{ "bytesBefore", file.bytesBefore },
+			};
+			if (apply)
+			{
+				entry["bytesAfter"] = file.bytesAfter;
+				entry["bytesSaved"] = file.bytesBefore - file.bytesAfter;
+			}
+			files.push_back(std::move(entry));
+		}
+
+		return Ok(json{
+			{ "applied", apply },
+			{ "filesScanned", report.filesScanned },
+			{ "namesAffected", report.namesAffected },
+			{ "bytesSaved", report.bytesSaved },
+			{ "files", std::move(files) },
+			{ "summary", report.Summary() },
 		});
 	}
 
