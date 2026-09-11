@@ -47,8 +47,24 @@ namespace sub::Spooner::CameraPaths
 		static float Dot(const Quat& a, const Quat& b);
 	};
 
+	// Where the easing is applied.
+	enum class Smoothing
+	{
+		// One curve over the whole path: it accelerates once at the start and
+		// settles once at the end, passing through the keys in between at
+		// speed. This is what a flythrough usually wants.
+		WholePath,
+		// A curve per segment. Every key becomes a full stop, which is right
+		// for deliberate stop-and-go and wrong for everything else.
+		PerKey,
+	};
+
 	struct CameraKey
 	{
+		// Stable across edits. Sorting by time reshuffles indices, so anything
+		// that remembers a key - a selection, a drag in progress - holds this
+		// instead of a position in the vector.
+		unsigned id = 0;
 		float time = 0.0f;            // seconds from the start of the path
 		Vector3 position;
 		Vector3 rotation;             // degrees, pitch/roll/yaw as Menyoo stores them
@@ -68,6 +84,8 @@ namespace sub::Spooner::CameraPaths
 	public:
 		std::string name = "untitled";
 		bool loop = false;
+		Smoothing smoothing = Smoothing::WholePath;
+		Easing pathEasing = Easing::InOutSine;
 		// Spreads progress by distance travelled rather than by spline
 		// parameter, so a long segment does not race a short one.
 		bool constantSpeed = true;
@@ -91,13 +109,39 @@ namespace sub::Spooner::CameraPaths
 		// Positions sampled along the whole path, for drawing the trajectory.
 		std::vector<Vector3> Polyline(int samplesPerSegment) const;
 
-		void AddKey(const CameraKey& key);
+		void AddKey(const CameraKey& key);      // assigns the id
 		void RemoveKey(size_t index);
+		void RemoveIds(const std::vector<unsigned>& ids);
+
+		int IndexOfId(unsigned id) const;
+
+		// Stretches or squeezes the given keys about `anchorTime`. This is how
+		// a move recorded too fast is slowed down without replacing it.
+		void ScaleTimes(const std::vector<unsigned>& ids, float factor, float anchorTime);
+
+		// Scales the whole path so it lasts `seconds`.
+		void SetTotalDuration(float seconds);
+
+		// Moves every key at or after `fromTime` by `delta`, which is how an
+		// insert makes room for itself instead of overwriting what follows.
+		void ShiftTimesFrom(float fromTime, float delta);
+
+		// A second key with the same pose `seconds` later, everything after it
+		// pushed back. Two identical keys evaluate to a still camera, so this
+		// is a pause at the key. Returns the new key's id, or 0 on failure.
+		unsigned InsertPause(unsigned id, float seconds);
+
+		// Pastes keys whose times are relative to the first one.
+		std::vector<unsigned> InsertKeys(const std::vector<CameraKey>& items,
+			float atTime, bool shiftLater);
+
+		std::vector<CameraKey> CopyKeys(const std::vector<unsigned>& ids) const;
 
 	private:
 		// Per segment, cumulative distance at each sample, used to convert a
 		// distance fraction back into a spline parameter.
 		std::vector<std::vector<float>> m_arcTables;
+		unsigned m_nextId = 1;
 
 		Vector3 SplinePosition(int segment, float u) const;
 		float ReparameterizeByArcLength(int segment, float t) const;

@@ -84,6 +84,9 @@ namespace sub::Spooner::CameraPaths::Files
 		root.append_attribute("name") = path.name.c_str();
 		root.append_attribute("loop") = path.loop;
 		root.append_attribute("constantSpeed") = path.constantSpeed;
+		root.append_attribute("smoothing") =
+			path.smoothing == Smoothing::WholePath ? "WholePath" : "PerKey";
+		root.append_attribute("pathEasing") = EasingName(path.pathEasing);
 
 		for (const CameraKey& key : path.keys)
 		{
@@ -138,6 +141,11 @@ namespace sub::Spooner::CameraPaths::Files
 		loaded.name = root.attribute("name").as_string(name.c_str());
 		loaded.loop = root.attribute("loop").as_bool(false);
 		loaded.constantSpeed = root.attribute("constantSpeed").as_bool(true);
+		// Files written before whole-path smoothing existed get it anyway: it
+		// is what they were trying to look like.
+		loaded.smoothing = std::string(root.attribute("smoothing").as_string("WholePath")) == "PerKey"
+			? Smoothing::PerKey : Smoothing::WholePath;
+		loaded.pathEasing = EasingFromName(root.attribute("pathEasing").as_string("In-Out Sine"));
 
 		for (auto node = root.child("Key"); node; node = node.next_sibling("Key"))
 		{

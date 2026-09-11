@@ -49,6 +49,7 @@ namespace sub::Spooner
 		bool bKeepPositionWhenAttaching = false;
 		
 		bool bTeleportToReferenceWhenLoadingFile = true;
+		bool bClearDbBeforeLoadingFile = false;
 
 		bool bGridSnapEnabled = false; // use SnapPos / SnapRot to get the snapped position / rotation Vector3
 		float gridSnapSize = 1.0f;

@@ -2156,7 +2156,9 @@ namespace sub::Spooner
 					}
 				}
 			}
-			if (nodeRoot.child("ClearDatabase").text().as_bool())
+			// The map can ask for this itself; the setting forces it for maps
+			// that do not, which is what loading one scene after another needs.
+			if (Settings::bClearDbBeforeLoadingFile || nodeRoot.child("ClearDatabase").text().as_bool())
 			{
 				EntityManagement::DeleteAllEntitiesInDb();
 				WAIT(0);

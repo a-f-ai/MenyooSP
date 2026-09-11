@@ -44,6 +44,11 @@ namespace sub::Spooner
 		extern bool bKeepPositionWhenAttaching;
 
 		extern bool bTeleportToReferenceWhenLoadingFile;
+		// Loading a map adds to whatever is already spawned, so two maps in a
+		// row pile up unless the database is emptied first. Off by default,
+		// because a map that expects to be layered on top of another is a
+		// legitimate thing to build.
+		extern bool bClearDbBeforeLoadingFile;
 
 		extern bool bGridSnapEnabled;
 		extern float gridSnapSize;

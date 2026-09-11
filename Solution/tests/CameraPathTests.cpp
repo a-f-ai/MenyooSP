@@ -133,6 +133,9 @@ namespace
 		std::printf("constant speed evens out segments of different length\n");
 		auto travelInFirstHalf = [](bool constantSpeed) {
 			CameraPath path;
+			// This is about arc length, so the global curve must not also bend
+			// time underneath it.
+			path.smoothing = Smoothing::PerKey;
 			path.constantSpeed = constantSpeed;
 			path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
 			path.AddKey(Key(1.0f, 100.0f, 0.0f, 0.0f));   // long leg
@@ -215,6 +218,144 @@ namespace
 		Check(Near(path.Evaluate(0.5f).fov, 45.0f), "fov moves halfway at the midpoint");
 	}
 
+
+	// Whole-path smoothing exists because per-key easing stops the camera dead
+	// at every key, which reads as a stutter rather than a flythrough.
+	void WholePathSmoothingDoesNotStopAtEveryKey()
+	{
+		std::printf("whole-path smoothing does not stop at intermediate keys\n");
+
+		auto speedAtKey = [](Smoothing mode) {
+			CameraPath path;
+			path.smoothing = mode;
+			path.pathEasing = Easing::InOutSine;
+			path.constantSpeed = false;
+			CameraKey a = Key(0.0f, 0.0f, 0.0f, 0.0f);
+			CameraKey b = Key(2.0f, 20.0f, 0.0f, 0.0f);
+			CameraKey c = Key(4.0f, 40.0f, 0.0f, 0.0f);
+			a.easing = Easing::InOutSine;
+			b.easing = Easing::InOutSine;
+			c.easing = Easing::InOutSine;
+			path.AddKey(a); path.AddKey(b); path.AddKey(c);
+			path.Rebuild();
+			// Distance covered in a tenth of a second either side of the middle key.
+			const float before = path.Evaluate(2.0f).position.x - path.Evaluate(1.9f).position.x;
+			const float after = path.Evaluate(2.1f).position.x - path.Evaluate(2.0f).position.x;
+			return std::fabs(before) + std::fabs(after);
+		};
+
+		const float perKey = speedAtKey(Smoothing::PerKey);
+		const float wholePath = speedAtKey(Smoothing::WholePath);
+		Check(perKey < 0.35f,
+			std::string("per-key easing nearly halts at the key, moved ") + std::to_string(perKey));
+		Check(wholePath > perKey * 3.0f,
+			std::string("whole-path keeps moving through it, moved ") + std::to_string(wholePath));
+	}
+
+	// A pause is two keys with the same pose. The spline would drift between
+	// them, so the evaluator has to special-case it.
+	void IdenticalKeysHoldTheCameraStill()
+	{
+		std::printf("two keys with the same pose hold the camera still\n");
+		CameraPath path;
+		path.smoothing = Smoothing::PerKey;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(2.0f, 20.0f, 5.0f, 3.0f));
+		path.Rebuild();
+
+		const unsigned held = path.keys[1].id;
+		const unsigned added = path.InsertPause(held, 1.5f);
+		Check(added != 0, "the pause key was inserted");
+		Check(path.keys.size() == 3, "it added exactly one key");
+
+		const CameraPose atStart = path.Evaluate(2.0f);
+		const CameraPose atMiddle = path.Evaluate(2.75f);
+		const CameraPose atEnd = path.Evaluate(3.5f);
+		Check(Near(atStart.position.x, atMiddle.position.x, 0.001f) &&
+			Near(atMiddle.position.x, atEnd.position.x, 0.001f),
+			"the camera does not drift during the pause");
+		Check(Near(atMiddle.position.y, 5.0f, 0.001f) && Near(atMiddle.position.z, 3.0f, 0.001f),
+			"it holds the pose of the key it was told to hold");
+	}
+
+	void InsertingAPausePushesLaterKeysBack()
+	{
+		std::printf("inserting a pause pushes later keys back\n");
+		CameraPath path;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(2.0f, 10.0f, 0.0f, 0.0f));
+		path.AddKey(Key(4.0f, 20.0f, 0.0f, 0.0f));
+
+		const unsigned middle = path.keys[1].id;
+		path.InsertPause(middle, 1.0f);
+
+		Check(path.keys.size() == 4, "one key was added");
+		Check(Near(path.keys[0].time, 0.0f) && Near(path.keys[1].time, 2.0f), "earlier keys stay put");
+		Check(Near(path.keys[2].time, 3.0f), "the twin lands after the pause");
+		Check(Near(path.keys[3].time, 5.0f), "the key that followed moved back by the pause");
+	}
+
+	void ScalingStretchesTheTiming()
+	{
+		std::printf("scaling stretches selected keys in time\n");
+		CameraPath path;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(1.0f, 10.0f, 0.0f, 0.0f));
+		path.AddKey(Key(2.0f, 20.0f, 0.0f, 0.0f));
+
+		std::vector<unsigned> all;
+		for (const CameraKey& key : path.keys) all.push_back(key.id);
+		path.ScaleTimes(all, 2.0f, 0.0f);
+
+		Check(Near(path.keys[1].time, 2.0f) && Near(path.keys[2].time, 4.0f),
+			"times doubled about the anchor");
+		Check(Near(path.Duration(), 4.0f), "the path lasts twice as long");
+
+		path.SetTotalDuration(8.0f);
+		Check(Near(path.Duration(), 8.0f), "total length sets the whole move");
+		Check(Near(path.keys[1].time, 4.0f), "and everything in between scales with it");
+	}
+
+	void KeysKeepTheirIdentityAcrossEdits()
+	{
+		std::printf("keys keep their identity when the order changes\n");
+		CameraPath path;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(1.0f, 10.0f, 0.0f, 0.0f));
+		path.AddKey(Key(2.0f, 20.0f, 0.0f, 0.0f));
+
+		const unsigned moved = path.keys[0].id;
+		path.keys[0].time = 5.0f;     // dragged past the others
+		path.Rebuild();
+
+		Check(path.IndexOfId(moved) == 2, "the dragged key is found at its new index");
+		Check(path.keys[0].time == 1.0f, "the others closed up behind it");
+
+		path.RemoveIds({ path.keys[0].id });
+		Check(path.keys.size() == 2 && path.IndexOfId(moved) >= 0, "removal by id takes the right key");
+	}
+
+	void ClipboardRoundTrips()
+	{
+		std::printf("copied keys paste relative to where they land\n");
+		CameraPath path;
+		path.AddKey(Key(0.0f, 0.0f, 0.0f, 0.0f));
+		path.AddKey(Key(1.0f, 10.0f, 0.0f, 0.0f));
+		path.AddKey(Key(2.0f, 20.0f, 0.0f, 0.0f));
+
+		const std::vector<CameraKey> copied = path.CopyKeys({ path.keys[0].id, path.keys[1].id });
+		Check(copied.size() == 2, "both keys were copied");
+		Check(Near(copied[0].time, 0.0f) && Near(copied[1].time, 1.0f),
+			"times are relative to the first copied key");
+
+		const std::vector<unsigned> pasted = path.InsertKeys(copied, 2.0f, true);
+		Check(pasted.size() == 2, "both keys were pasted");
+		Check(path.keys.size() == 5, "the path grew by two");
+		Check(Near(path.Duration(), 3.0f),
+			std::string("the key that followed was pushed back, duration ") +
+			std::to_string(path.Duration()));
+	}
+
 	void RemovingAKeyRebuilds()
 	{
 		std::printf("removing a key keeps the path usable\n");
@@ -244,6 +385,12 @@ int main()
 	AnEmptyOrSingleKeyPathIsSafe();
 	FovIsKeyframed();
 	RemovingAKeyRebuilds();
+	WholePathSmoothingDoesNotStopAtEveryKey();
+	IdenticalKeysHoldTheCameraStill();
+	InsertingAPausePushesLaterKeysBack();
+	ScalingStretchesTheTiming();
+	KeysKeepTheirIdentityAcrossEdits();
+	ClipboardRoundTrips();
 
 	if (g_failures == 0)
 	{

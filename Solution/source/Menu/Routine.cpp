@@ -16,6 +16,7 @@
 #include "../Submenus/Spooner/ImGuiSpooner.h"
 #include "..\Http\HttpServer.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Submenus\Spooner\ImGuiSpooner.h"
 #include "..\Util\keyboard.h"
 
 #include <mutex>
@@ -251,7 +252,14 @@ inline void MenyooMain()
 				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
 				sub::Spooner::CameraPaths::State().requestAddKeyAtCamera = true;
 			}
-			if (IsKeyJustUp(BindCameraPathPlay))
+			// Space is the obvious transport key, but only while the window has
+			// the mouse and nothing is being typed into it.
+			const bool spaceTransport =
+				sub::Spooner::CameraPaths::IsCursorMode() &&
+				!sub::Spooner::ImGuiSpooner::WantsTextInput() &&
+				IsKeyJustUp(VirtualKey::Space);
+
+			if (IsKeyJustUp(BindCameraPathPlay) || spaceTransport)
 			{
 				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
 				auto& state = sub::Spooner::CameraPaths::State();

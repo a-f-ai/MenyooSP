@@ -148,6 +148,7 @@ namespace sub::Spooner::CameraPaths
 			state.requestNew = false;
 			state.path = CameraPath();
 			state.time = 0.0f;
+			state.selectedIds.clear();
 			state.selectedKey = -1;
 			state.transport = Transport::Stopped;
 			GiveBackView();
@@ -166,7 +167,8 @@ namespace sub::Spooner::CameraPaths
 			key.fov = authorFov;
 			key.easing = Easing::InOutSine;
 			state.path.AddKey(key);
-			state.selectedKey = static_cast<int>(state.path.keys.size()) - 1;
+			state.selectedKey = state.path.IndexOfId(state.path.keys.back().id);
+			state.selectedIds = { state.path.keys[state.selectedKey].id };
 			state.status = "key added at " + std::to_string(key.time) + "s";
 		}
 
@@ -188,11 +190,22 @@ namespace sub::Spooner::CameraPaths
 			}
 		}
 
+		if (!state.requestDeleteIds.empty())
+		{
+			const size_t count = state.requestDeleteIds.size();
+			state.path.RemoveIds(state.requestDeleteIds);
+			state.requestDeleteIds.clear();
+			state.selectedIds.clear();
+			state.selectedKey = -1;
+			state.status = std::to_string(count) + " key(s) deleted";
+		}
+
 		if (state.requestDeleteKey >= 0)
 		{
 			const int index = state.requestDeleteKey;
 			state.requestDeleteKey = -1;
 			state.path.RemoveKey(static_cast<size_t>(index));
+			state.selectedIds.clear();
 			state.selectedKey = -1;
 			state.status = "key " + std::to_string(index) + " deleted";
 		}
@@ -205,6 +218,7 @@ namespace sub::Spooner::CameraPaths
 			if (Files::Load(name, state.path, failure))
 			{
 				state.time = 0.0f;
+				state.selectedIds.clear();
 				state.selectedKey = -1;
 				state.transport = Transport::Stopped;
 				state.status = "loaded " + name;

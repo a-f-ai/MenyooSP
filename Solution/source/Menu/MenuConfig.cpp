@@ -195,6 +195,7 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::Settings::bSpawnStillPeds = ini.GetBoolValue(section_spooner.c_str(), "SpawnStillPeds", sub::Spooner::Settings::bSpawnStillPeds);
 	sub::Spooner::Settings::bAddToDbAsMissionEntities = ini.GetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
+	sub::Spooner::Settings::bClearDbBeforeLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
 	sub::Spooner::Settings::bKeepPositionWhenAttaching = ini.GetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	sub::Spooner::Settings::spoonerModeMode = (sub::Spooner::eSpoonerModeMode)ini.GetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
 	sub::Spooner::Settings::bAutoSaveDb = ini.GetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);
@@ -464,6 +465,7 @@ void MenuConfig::SaveConfig()
 	ini.SetBoolValue(section_spooner.c_str(), "SpawnStillPeds", sub::Spooner::Settings::bSpawnStillPeds);
 	ini.SetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	ini.SetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
+	ini.SetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
 	ini.SetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	ini.SetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
 	ini.SetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);

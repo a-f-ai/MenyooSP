@@ -59,6 +59,7 @@ namespace sub::Spooner::ImGuiSpooner
 
 	static std::atomic<bool> g_Visible{ false };
 	static std::atomic<bool> g_ShuttingDown{ false };
+	static std::atomic<bool> g_WantsTextInput{ false };
 	static bool g_ImGuiInitialized = false;
 
 	static void BuildTransformMatrix(const Vector3& pos, const Vector3& rot, const Vector3& scale, float* matrix)
@@ -398,6 +399,9 @@ namespace sub::Spooner::ImGuiSpooner
 
 		CameraPathUI::Draw();
 
+		// Published for the script thread, which polls the hotkeys.
+		g_WantsTextInput.store(ImGui::GetIO().WantTextInput, std::memory_order_relaxed);
+
 		ImGui::Render();
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	}
@@ -590,6 +594,11 @@ namespace sub::Spooner::ImGuiSpooner
 	void NotifyOverlayChanged()
 	{
 		D3D11Hook::SetMenuVisible(g_Visible || CameraPaths::IsWindowVisible());
+	}
+
+	bool WantsTextInput()
+	{
+		return g_WantsTextInput.load(std::memory_order_relaxed);
 	}
 
 	bool IsVisible()

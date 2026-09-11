@@ -20,6 +20,18 @@ namespace sub::Spooner::CameraPaths
 			return value;
 		}
 
+		bool SamePose(const CameraKey& a, const CameraKey& b)
+		{
+			const float tolerance = 1e-3f;
+			return std::fabs(a.position.x - b.position.x) < tolerance &&
+				std::fabs(a.position.y - b.position.y) < tolerance &&
+				std::fabs(a.position.z - b.position.z) < tolerance &&
+				std::fabs(a.rotation.x - b.rotation.x) < tolerance &&
+				std::fabs(a.rotation.y - b.rotation.y) < tolerance &&
+				std::fabs(a.rotation.z - b.rotation.z) < tolerance &&
+				std::fabs(a.fov - b.fov) < tolerance;
+		}
+
 		float Radians(float degrees) { return degrees * kPi / 180.0f; }
 		float Degrees(float radians) { return radians * 180.0f / kPi; }
 
@@ -297,13 +309,37 @@ namespace sub::Spooner::CameraPaths
 			time = std::max(keys.front().time, std::min(time, keys.back().time));
 		}
 
+		// Whole-path smoothing bends time once, before any segment is chosen,
+		// so the curve spans the entire move instead of restarting at each key.
+		if (smoothing == Smoothing::WholePath)
+		{
+			const float first = keys.front().time;
+			const float last = keys.back().time;
+			if (last - first > 1e-4f)
+			{
+				const float progress = (time - first) / (last - first);
+				time = first + ApplyEasing(pathEasing, progress) * (last - first);
+			}
+		}
+
 		const int segment = SegmentAt(time);
 		const CameraKey& from = keys[segment];
 		const CameraKey& to = keys[segment + 1];
 
+		// Two keys with the same pose mean a deliberate pause. Running them
+		// through the spline would not hold still: Catmull-Rom takes its
+		// tangents from the neighbouring keys, so the camera would drift away
+		// and back again.
+		if (SamePose(from, to))
+			return CameraPose{ from.position, from.rotation, from.fov };
+
 		const float span = to.time - from.time;
 		const float raw = span <= 1e-6f ? 1.0f : (time - from.time) / span;
-		const float eased = ApplyEasing(from.easing, raw);
+		// In whole-path mode the shaping already happened above; easing again
+		// here would put the stop back at every key.
+		const float eased = smoothing == Smoothing::PerKey
+			? ApplyEasing(from.easing, raw)
+			: raw;
 		const float u = constantSpeed ? ReparameterizeByArcLength(segment, eased) : eased;
 
 		const Quat orientation = Quat::Slerp(
@@ -341,7 +377,9 @@ namespace sub::Spooner::CameraPaths
 
 	void CameraPath::AddKey(const CameraKey& key)
 	{
-		keys.push_back(key);
+		CameraKey copy = key;
+		copy.id = m_nextId++;
+		keys.push_back(copy);
 		Rebuild();
 	}
 
@@ -350,6 +388,137 @@ namespace sub::Spooner::CameraPaths
 		if (index >= keys.size())
 			return;
 		keys.erase(keys.begin() + static_cast<long>(index));
+		Rebuild();
+	}
+
+	void CameraPath::RemoveIds(const std::vector<unsigned>& ids)
+	{
+		if (ids.empty())
+			return;
+		keys.erase(std::remove_if(keys.begin(), keys.end(),
+			[&ids](const CameraKey& key) {
+				return std::find(ids.begin(), ids.end(), key.id) != ids.end();
+			}), keys.end());
+		Rebuild();
+	}
+
+	int CameraPath::IndexOfId(unsigned id) const
+	{
+		for (size_t i = 0; i < keys.size(); ++i)
+		{
+			if (keys[i].id == id)
+				return static_cast<int>(i);
+		}
+		return -1;
+	}
+
+	void CameraPath::ScaleTimes(const std::vector<unsigned>& ids, float factor, float anchorTime)
+	{
+		if (ids.empty() || factor <= 0.0f)
+			return;
+
+		for (CameraKey& key : keys)
+		{
+			if (std::find(ids.begin(), ids.end(), key.id) == ids.end())
+				continue;
+			key.time = anchorTime + (key.time - anchorTime) * factor;
+			if (key.time < 0.0f)
+				key.time = 0.0f;
+		}
+		Rebuild();
+	}
+
+	// Strictly after, so a key sitting exactly on `fromTime` stays where it is.
+	// An inclusive test here silently dragged the very key an insert was
+	// anchored to, which turned a pause into a slide.
+	void CameraPath::ShiftTimesFrom(float fromTime, float delta)
+	{
+		for (CameraKey& key : keys)
+		{
+			if (key.time > fromTime)
+				key.time += delta;
+		}
+		Rebuild();
+	}
+
+	unsigned CameraPath::InsertPause(unsigned id, float seconds)
+	{
+		const int index = IndexOfId(id);
+		if (index < 0 || seconds <= 0.0f)
+			return 0;
+
+		CameraKey copy = keys[static_cast<size_t>(index)];
+		const float insertAt = copy.time + seconds;
+
+		// Everything strictly after the original moves back to make room, so
+		// the rest of the move keeps its shape and only gains the pause.
+		ShiftTimesFrom(copy.time, seconds);
+
+		copy.time = insertAt;
+		copy.id = m_nextId++;
+		keys.push_back(copy);
+		Rebuild();
+		return copy.id;
+	}
+
+	std::vector<CameraKey> CameraPath::CopyKeys(const std::vector<unsigned>& ids) const
+	{
+		std::vector<CameraKey> copied;
+		for (const CameraKey& key : keys)
+		{
+			if (std::find(ids.begin(), ids.end(), key.id) != ids.end())
+				copied.push_back(key);
+		}
+		std::sort(copied.begin(), copied.end(),
+			[](const CameraKey& a, const CameraKey& b) { return a.time < b.time; });
+
+		// Times become relative to the first one, so a paste can land anywhere.
+		if (!copied.empty())
+		{
+			const float base = copied.front().time;
+			for (CameraKey& key : copied)
+				key.time -= base;
+		}
+		return copied;
+	}
+
+	std::vector<unsigned> CameraPath::InsertKeys(const std::vector<CameraKey>& items,
+		float atTime, bool shiftLater)
+	{
+		std::vector<unsigned> inserted;
+		if (items.empty())
+			return inserted;
+
+		float span = 0.0f;
+		for (const CameraKey& key : items)
+			span = std::max(span, key.time);
+
+		if (shiftLater && span > 0.0f)
+			ShiftTimesFrom(atTime - 1e-4f, span);
+
+		for (const CameraKey& item : items)
+		{
+			CameraKey copy = item;
+			copy.time = atTime + item.time;
+			copy.id = m_nextId++;
+			keys.push_back(copy);
+			inserted.push_back(copy.id);
+		}
+		Rebuild();
+		return inserted;
+	}
+
+	void CameraPath::SetTotalDuration(float seconds)
+	{
+		const float current = Duration();
+		if (keys.size() < 2 || current <= 1e-4f || seconds <= 1e-4f)
+			return;
+
+		// About the first key, so the path keeps starting where it started.
+		const float anchor = keys.front().time;
+		const float factor = (seconds - anchor) / (current - anchor);
+		for (CameraKey& key : keys)
+			key.time = anchor + (key.time - anchor) * factor;
 		Rebuild();
 	}
 }

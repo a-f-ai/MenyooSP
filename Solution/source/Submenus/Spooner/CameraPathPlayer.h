@@ -31,7 +31,10 @@ namespace sub::Spooner::CameraPaths
 		Transport transport = Transport::Stopped;
 		float time = 0.0f;
 		float speed = 1.0f;
-		int selectedKey = -1;
+		// Selection is by key id, not index, because sorting by time renumbers
+		// the vector under any edit.
+		std::vector<unsigned> selectedIds;
+		int selectedKey = -1;   // index of the last one clicked, for the editor panel
 		// The trajectory and its key markers are authoring aids. They are drawn
 		// into the world, so they would sit in the middle of any shot.
 		bool showPath = true;
@@ -40,11 +43,16 @@ namespace sub::Spooner::CameraPaths
 		bool requestAddKeyAtCamera = false;
 		bool requestUpdateKeyFromCamera = false;
 		int requestDeleteKey = -1;
+		std::vector<unsigned> requestDeleteIds;
 		bool requestPlay = false;
 		bool requestPause = false;
 		bool requestStop = false;
 		bool requestSeek = false;          // with `time` already set
 		bool requestPreviewKey = false;    // jump the camera to `selectedKey`
+		// Keys cut from the path, times relative to the first of them.
+		std::vector<CameraKey> clipboard;
+		float pauseSeconds = 1.0f;
+
 		std::string requestLoadName;
 		std::string requestSaveName;
 		bool requestNew = false;

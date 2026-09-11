@@ -260,6 +260,7 @@ namespace sub
 			AddToggle("Spawn Still Peds (Block Fleeing)", Settings::bSpawnStillPeds);
 			AddToggle("Make Added (To DB) Entities Persistent", Settings::bAddToDbAsMissionEntities);
 			AddToggle("Teleport To Reference When Loading File", Settings::bTeleportToReferenceWhenLoadingFile);
+			AddToggle("Clear Database Before Loading File", Settings::bClearDbBeforeLoadingFile);
 			AddTexter("Spooner Mode Method", static_cast<UINT8>(Settings::spoonerModeMode), spoonerModeModeNames, null, bSmm_plus, bSmm_minus);
 
 			if (Menu::usingControllerInput)
