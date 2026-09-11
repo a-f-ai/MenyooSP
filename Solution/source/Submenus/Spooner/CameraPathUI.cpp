@@ -9,6 +9,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <mutex>
 #include <string>
