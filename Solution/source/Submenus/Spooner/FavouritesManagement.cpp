@@ -45,7 +45,7 @@ namespace sub::Spooner
 				doc.reset();
 				auto nodeDecleration = doc.append_child(pugi::node_declaration);
 				nodeDecleration.append_attribute("version") = "1.0";
-				nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+				nodeDecleration.append_attribute("encoding") = "UTF-8";
 				auto nodeRoot = doc.append_child("FavouriteProps");
 				doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteProps).c_str());
 			}
@@ -137,7 +137,7 @@ namespace sub::Spooner
 				doc.reset();
 				auto nodeDeclaration = doc.append_child(pugi::node_declaration);
 				nodeDeclaration.append_attribute("version") = "1.0";
-				nodeDeclaration.append_attribute("encoding") = "ISO-8859-1";
+				nodeDeclaration.append_attribute("encoding") = "UTF-8";
 				doc.append_child("FavouriteBlipIcons");
 			}
 			auto nodeRoot = doc.child("FavouriteBlipIcons");

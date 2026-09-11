@@ -1743,7 +1743,7 @@ namespace sub
 
 			auto nodeDecleration = doc.append_child(pugi::node_declaration);
 			nodeDecleration.append_attribute("version") = "1.0";
-			nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+			nodeDecleration.append_attribute("encoding") = "UTF-8";
 
 			auto nodeEntity = doc.append_child("OutfitPedData"); // Root
 			nodeEntity.append_child("ClearDecalOverlays").text() = bClearDecalOverlays;

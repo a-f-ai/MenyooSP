@@ -1850,7 +1850,7 @@ namespace sub
 			doc.reset();
 			auto nodeDecleration = doc.append_child(pugi::node_declaration);
 			nodeDecleration.append_attribute("version") = "1.0";
-			nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+			nodeDecleration.append_attribute("encoding") = "UTF-8";
 			auto nodeRoot = doc.append_child("AddedVehicleModels");
 			doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlAddedVehicleModels).c_str());
 		}
@@ -2037,7 +2037,7 @@ namespace sub
 			doc.reset();
 			auto nodeDecleration = doc.append_child(pugi::node_declaration);
 			nodeDecleration.append_attribute("version") = "1.0";
-			nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+			nodeDecleration.append_attribute("encoding") = "UTF-8";
 			auto nodeRoot = doc.append_child("AddedVehicleModels");
 			doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlAddedVehicleModels).c_str());
 			return;
@@ -2837,7 +2837,7 @@ namespace sub
 
 			auto nodeDecleration = doc.append_child(pugi::node_declaration);
 			nodeDecleration.append_attribute("version") = "1.0";
-			nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+			nodeDecleration.append_attribute("encoding") = "UTF-8";
 
 			auto nodeVehicle = doc.append_child("Vehicle"); // Root
 			nodeVehicle.append_attribute("menyoo_ver") = MENYOO_CURRENT_VER_;

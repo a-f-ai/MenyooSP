@@ -240,7 +240,7 @@ namespace sub::Spooner
 			{
 				auto decl = doc.append_child(pugi::node_declaration);
 				decl.append_attribute("version") = "1.0";
-				decl.append_attribute("encoding") = "ISO-8859-1";
+				decl.append_attribute("encoding") = "UTF-8";
 				doc.append_child("SavedLights");
 			}
 
@@ -281,7 +281,7 @@ namespace sub::Spooner
 			pugi::xml_document doc;
 			auto decl = doc.append_child(pugi::node_declaration);
 			decl.append_attribute("version") = "1.0";
-			decl.append_attribute("encoding") = "ISO-8859-1";
+			decl.append_attribute("encoding") = "UTF-8";
 			auto root = doc.append_child("SavedLights");
 
 			for (auto& p : PresetDb)

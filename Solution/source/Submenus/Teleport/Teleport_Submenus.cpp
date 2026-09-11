@@ -272,7 +272,7 @@ namespace sub::TeleportLocations_catind
 				doc.reset();
 				auto nodeDecleration = doc.append_child(pugi::node_declaration);
 				nodeDecleration.append_attribute("version") = "1.0";
-				nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+				nodeDecleration.append_attribute("encoding") = "UTF-8";
 				auto nodeRoot = doc.append_child("SavedMapLocations");
 				doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlSavedMapLocations).c_str());
 				return;

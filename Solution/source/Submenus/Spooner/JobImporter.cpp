@@ -1324,7 +1324,7 @@ namespace sub::Spooner::JobConverter
         pugi::xml_document doc;
         auto decl = doc.append_child(pugi::node_declaration);
         decl.append_attribute("version") = "Job Importer";
-        decl.append_attribute("encoding") = "ISO-8859-1"; // should put the name of the creator of the job here incase people steal them and reupload.
+        decl.append_attribute("encoding") = "UTF-8"; // should put the name of the creator of the job here incase people steal them and reupload.
 
         auto nodeRoot = doc.append_child("SpoonerPlacements");
         nodeRoot.append_child("Note");

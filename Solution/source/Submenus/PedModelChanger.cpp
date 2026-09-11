@@ -74,7 +74,7 @@ namespace sub
 				doc.reset();
 				auto nodeDecleration = doc.append_child(pugi::node_declaration);
 				nodeDecleration.append_attribute("version") = "1.0";
-				nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+				nodeDecleration.append_attribute("encoding") = "UTF-8";
 				auto nodeRoot = doc.append_child("FavouriteWeapons");
 				doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouritePeds).c_str());
 			}
@@ -138,7 +138,7 @@ namespace sub
 				doc.reset();
 				auto nodeDeclaration = doc.append_child(pugi::node_declaration);
 				nodeDeclaration.append_attribute("version") = "1.0";
-				nodeDeclaration.append_attribute("encoding") = "ISO-8859-1";
+				nodeDeclaration.append_attribute("encoding") = "UTF-8";
 				auto nodeRoot = doc.append_child("FavouritePeds");
 				doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouritePeds).c_str());
 				return;
