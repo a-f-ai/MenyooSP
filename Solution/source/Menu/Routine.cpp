@@ -18,6 +18,8 @@
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
 #include "..\Util\keyboard.h"
 
+#include <mutex>
+
 #include "..\Util\FileLogger.h"
 #include "..\Util\ExePath.h"
 #include "..\Util\keyboard.h"
@@ -238,6 +240,32 @@ inline void MenyooMain()
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
 		if (IsKeyJustUp(BindCameraPath))
 			sub::Spooner::CameraPaths::ToggleWindow();
+		if (sub::Spooner::CameraPaths::IsWindowVisible())
+		{
+			// Hotkeys so a whole flythrough can be built with the camera in
+			// hand: the mouse is only needed for fine editing.
+			if (IsKeyJustUp(BindCameraPathCursor))
+				sub::Spooner::CameraPaths::ToggleCursorMode();
+			if (IsKeyJustUp(BindCameraPathAddKey))
+			{
+				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
+				sub::Spooner::CameraPaths::State().requestAddKeyAtCamera = true;
+			}
+			if (IsKeyJustUp(BindCameraPathPlay))
+			{
+				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
+				auto& state = sub::Spooner::CameraPaths::State();
+				if (state.transport == sub::Spooner::CameraPaths::Transport::Playing)
+					state.requestPause = true;
+				else
+					state.requestPlay = true;
+			}
+			if (IsKeyJustUp(BindCameraPathStop))
+			{
+				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
+				sub::Spooner::CameraPaths::State().requestStop = true;
+			}
+		}
 		sub::Spooner::CameraPaths::Tick();
 		Http::Server::DrainCommands();
 		WAIT(0);
@@ -567,6 +595,10 @@ void TickNeonFwkAnim()
 
 INT16 BindNoClip = VirtualKey::F3;
 INT16 BindCameraPath = VirtualKey::F10;
+INT16 BindCameraPathCursor = VirtualKey::F7;
+INT16 BindCameraPathAddKey = VirtualKey::Insert;
+INT16 BindCameraPathPlay = VirtualKey::Home;
+INT16 BindCameraPathStop = VirtualKey::End;
 
 INT16 bind_no_clip = VirtualKey::F3;
 

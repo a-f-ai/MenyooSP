@@ -70,4 +70,11 @@ namespace sub::Spooner::CameraPaths
 	bool IsWindowVisible();
 	void SetWindowVisible(bool visible);
 	void ToggleWindow();
+
+	// While cursor mode is on the mouse belongs to the window and the game
+	// stops reading it, which is the same bargain the spooner's gizmo makes
+	// with its "lock camera" key. Off by default, so opening the window never
+	// costs you control of the camera.
+	bool IsCursorMode();
+	void ToggleCursorMode();
 }

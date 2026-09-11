@@ -105,6 +105,10 @@ void MenuConfig::ConfigRead()
 
 	BindNoClip = ini.GetLongValue(section_general.c_str(), "FreeCamButton", BindNoClip);
 	BindCameraPath = ini.GetLongValue(section_general.c_str(), "CameraPathButton", BindCameraPath);
+	BindCameraPathCursor = ini.GetLongValue(section_general.c_str(), "CameraPathCursorButton", BindCameraPathCursor);
+	BindCameraPathAddKey = ini.GetLongValue(section_general.c_str(), "CameraPathAddKeyButton", BindCameraPathAddKey);
+	BindCameraPathPlay = ini.GetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
+	BindCameraPathStop = ini.GetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
 
 
 	std::string section_colours = "colours";/////////
@@ -370,6 +374,10 @@ void MenuConfig::SaveConfig()
 
 	ini.SetLongValue(section_general.c_str(), "FreeCamButton", BindNoClip);
 	ini.SetLongValue(section_general.c_str(), "CameraPathButton", BindCameraPath);
+	ini.SetLongValue(section_general.c_str(), "CameraPathCursorButton", BindCameraPathCursor);
+	ini.SetLongValue(section_general.c_str(), "CameraPathAddKeyButton", BindCameraPathAddKey);
+	ini.SetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
+	ini.SetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
 
 
 	std::string section_colours = "colours";/////////

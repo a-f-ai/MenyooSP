@@ -4,6 +4,7 @@
 #include "CameraPathPlayer.h"
 
 #include "CameraPathFile.h"
+#include "ImGuiSpooner.h"
 #include "SpoonerMode.h"
 
 #include "../../macros.h"
@@ -24,6 +25,7 @@ namespace sub::Spooner::CameraPaths
 		std::mutex g_mutex;
 		PlayerState g_state;
 		bool g_windowVisible = false;
+		bool g_cursorMode = false;
 
 		// The one camera the path drives. Created when playback or a preview
 		// first needs it, destroyed when the view goes back to the game.
@@ -106,8 +108,19 @@ namespace sub::Spooner::CameraPaths
 	PlayerState& State() { return g_state; }
 
 	bool IsWindowVisible() { return g_windowVisible; }
-	void SetWindowVisible(bool visible) { g_windowVisible = visible; }
-	void ToggleWindow() { g_windowVisible = !g_windowVisible; }
+
+	void SetWindowVisible(bool visible)
+	{
+		g_windowVisible = visible;
+		if (!visible)
+			g_cursorMode = false;
+		ImGuiSpooner::NotifyOverlayChanged();
+	}
+
+	void ToggleWindow() { SetWindowVisible(!g_windowVisible); }
+
+	bool IsCursorMode() { return g_windowVisible && g_cursorMode; }
+	void ToggleCursorMode() { if (g_windowVisible) g_cursorMode = !g_cursorMode; }
 
 	void Release()
 	{

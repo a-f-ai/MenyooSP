@@ -349,7 +349,7 @@ namespace sub::Spooner::ImGuiSpooner
 
 	static void OnRender(ID3D11Device* device, ID3D11DeviceContext* context, IDXGISwapChain* swapChain)
 	{
-		if (g_ShuttingDown || !g_Visible)
+		if (g_ShuttingDown || (!g_Visible && !CameraPaths::IsWindowVisible()))
 		{
 			D3D11Hook::SetMenuVisible(false);
 			return;
@@ -388,13 +388,12 @@ namespace sub::Spooner::ImGuiSpooner
 		{
 			std::lock_guard<std::mutex> lock(g_Mutex);
 
-			// The camera path window needs a pointer of its own, whatever the
-			// gizmo is doing.
 			ImGui::GetIO().MouseDrawCursor =
 				(g_Shared.editingState.mode == SpoonerMode::eEditMode::Gizmo && g_Shared.editingState.cameraLocked) ||
-				CameraPaths::IsWindowVisible();
+				CameraPaths::IsCursorMode();
 
-			RunGizmo_NoLock(g_Shared);
+			if (g_Visible)
+				RunGizmo_NoLock(g_Shared);
 		}
 
 		CameraPathUI::Draw();
@@ -547,8 +546,10 @@ namespace sub::Spooner::ImGuiSpooner
 				g_Shared.gizmoUsing);
 		}
 
-		// Dragging keys on the timeline must not also steer the player.
-		if (CameraPaths::IsWindowVisible())
+		// Only while the window owns the mouse. Suppressing input just because
+		// the window is open takes away camera control, which is exactly what
+		// you need in order to place a key.
+		if (CameraPaths::IsCursorMode())
 			suppressGameInput = true;
 
 		if (suppressGameInput)
@@ -583,7 +584,12 @@ namespace sub::Spooner::ImGuiSpooner
 	void SetVisible(bool visible)
 	{
 		g_Visible = visible;
-		D3D11Hook::SetMenuVisible(visible);
+		NotifyOverlayChanged();
+	}
+
+	void NotifyOverlayChanged()
+	{
+		D3D11Hook::SetMenuVisible(g_Visible || CameraPaths::IsWindowVisible());
 	}
 
 	bool IsVisible()

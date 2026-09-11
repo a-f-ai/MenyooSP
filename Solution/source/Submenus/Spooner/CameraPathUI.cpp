@@ -244,6 +244,16 @@ namespace sub::Spooner::CameraPathUI
 		ImGui::SetNextItemWidth(110.0f);
 		ImGui::DragFloat("Speed", &state.speed, 0.01f, 0.05f, 8.0f, "%.2fx");
 
+		// The window is useless if the mouse cannot reach it and dangerous if it
+		// takes the camera away, so say plainly which mode you are in.
+		if (CameraPaths::IsCursorMode())
+			ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f),
+				"Cursor mode: F7 gives the camera back");
+		else
+			ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.35f, 1.0f),
+				"Camera is yours. F7 to use the mouse here");
+		ImGui::TextDisabled("Insert add key at camera  |  Home play/pause  |  End stop  |  F10 hide");
+
 		ImGui::Separator();
 		ImGui::Text("%d keys, %.2f s", static_cast<int>(state.path.keys.size()), state.path.Duration());
 		ImGui::SameLine();
