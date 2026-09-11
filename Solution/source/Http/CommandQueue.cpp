@@ -15,12 +15,17 @@ namespace Http
 		constexpr std::chrono::milliseconds kFiberTimeout{ 2000 };
 	}
 
-	CommandQueue::CommandQueue(size_t maxDepth, std::chrono::milliseconds timeout)
-		: m_maxDepth(maxDepth), m_timeout(timeout), m_running(true)
+	CommandQueue::CommandQueue(size_t maxDepth, std::chrono::milliseconds defaultTimeout)
+		: m_maxDepth(maxDepth), m_defaultTimeout(defaultTimeout), m_running(true), m_draining(false)
 	{
 	}
 
 	Response CommandQueue::Submit(std::function<Response()> work)
+	{
+		return Submit(std::move(work), m_defaultTimeout);
+	}
+
+	Response CommandQueue::Submit(std::function<Response()> work, std::chrono::milliseconds timeout)
 	{
 		auto command = std::make_shared<Command>();
 		command->run = std::move(work);
@@ -35,7 +40,7 @@ namespace Http
 			m_pending.push_back(command);
 		}
 
-		if (pending.wait_for(m_timeout) != std::future_status::ready)
+		if (pending.wait_for(timeout) != std::future_status::ready)
 		{
 			// The fiber is blocked (map load, RequestAnimDict, a pause menu) or
 			// ScriptHookV has stopped ticking it. Say so instead of holding the
@@ -52,6 +57,9 @@ namespace Http
 		std::deque<std::shared_ptr<Command>> batch;
 		{
 			std::lock_guard<std::mutex> lock(m_mutex);
+			if (m_draining)
+				return; // re-entered from a command that yielded the fiber
+			m_draining = true;
 			batch.swap(m_pending);
 		}
 
@@ -63,6 +71,9 @@ namespace Http
 		{
 			command->result.set_value(command->run());
 		}
+
+		std::lock_guard<std::mutex> lock(m_mutex);
+		m_draining = false;
 	}
 
 	void CommandQueue::Stop()

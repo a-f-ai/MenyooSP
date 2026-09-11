@@ -14,6 +14,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace Http::EntityApi
 {
@@ -26,22 +27,43 @@ namespace Http::EntityApi
 	{
 		int type;              // 1 = PED, 2 = VEHICLE, 3 = PROP
 		unsigned long model;
-		std::string name;      // optional label shown in the spooner
+		std::string modelLabel; // what the caller wrote, for error messages
+		std::string name;      // label shown in the spooner
 		Vec3 position;
 		Vec3 rotation;         // pitch, roll, yaw
 		bool dynamic;
-		bool placeOnGround;
+		// Replace position.z with the surface found by casting down from it.
+		// This is why a caller never has to guess a height.
+		bool snapToGround;
+		bool still;            // peds only: hold position instead of wandering
+		std::string scenario;  // peds only
+		std::string animDict;  // peds only
+		std::string animName;  // peds only
 	};
 
 	struct PatchRequest
 	{
 		std::optional<Vec3> position;
 		std::optional<Vec3> rotation;
+		std::optional<bool> snapToGround;
+		std::optional<std::string> scenario;
+		std::optional<std::string> animDict;
+		std::optional<std::string> animName;
 	};
 
-	Response ListEntities();
+	struct ListQuery
+	{
+		std::string namePrefix;
+		std::string type;      // "", "ped", "vehicle", "prop"
+		int limit;
+		int offset;
+	};
+
+	Response ListEntities(const ListQuery& query);
 	Response GetEntity(int id);
 	Response CreateEntity(const CreateRequest& request);
+	Response CreateBatch(const std::vector<CreateRequest>& requests);
 	Response PatchEntity(int id, const PatchRequest& request);
 	Response DeleteEntity(int id);
+	Response DeleteMatching(const std::string& namePrefix, const std::string& type);
 }
