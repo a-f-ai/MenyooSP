@@ -32,6 +32,9 @@ namespace sub::Spooner::CameraPaths
 		float time = 0.0f;
 		float speed = 1.0f;
 		int selectedKey = -1;
+		// The trajectory and its key markers are authoring aids. They are drawn
+		// into the world, so they would sit in the middle of any shot.
+		bool showPath = true;
 
 		// Raised by the window or the HTTP bridge, cleared by the script thread.
 		bool requestAddKeyAtCamera = false;

@@ -319,8 +319,11 @@ namespace sub::Spooner::CameraPaths
 		state.liveCameraRotation = authorRotation;
 		state.liveCameraFov = authorFov;
 
-		// The trajectory is only worth drawing while the user is working on it.
-		if (g_windowVisible && state.path.keys.size() >= 1)
+		// Never during playback: the line and the markers are in the world, so
+		// they would be in the footage.
+		const bool drawAids = g_windowVisible && state.showPath &&
+			state.transport != Transport::Playing && !state.path.Empty();
+		if (drawAids)
 			DrawTrajectory(state.path);
 	}
 }

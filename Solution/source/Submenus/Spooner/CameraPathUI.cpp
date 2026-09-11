@@ -236,6 +236,8 @@ namespace sub::Spooner::CameraPathUI
 		ImGui::SameLine();
 		if (ImGui::Button("New")) state.requestNew = true;
 
+		ImGui::Checkbox("Show path", &state.showPath);
+		ImGui::SameLine();
 		ImGui::Checkbox("Loop", &state.path.loop);
 		ImGui::SameLine();
 		if (ImGui::Checkbox("Constant speed", &state.path.constantSpeed))
@@ -273,6 +275,15 @@ namespace sub::Spooner::CameraPathUI
 
 		if (ImGui::CollapsingHeader("Files"))
 			DrawFiles(state);
+
+		// Seeking or previewing a key leaves the path camera holding that pose,
+		// which looks like the game has frozen if you do not know why.
+		if (state.pathCameraOwnsView && state.transport != Transport::Playing)
+		{
+			ImGui::Separator();
+			ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
+				"The path camera has the view. Stop to give it back.");
+		}
 
 		if (!state.status.empty())
 		{
