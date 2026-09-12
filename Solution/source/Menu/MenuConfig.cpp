@@ -7,6 +7,7 @@
 * the Free Software Foundation, either version 3 of the License, or
 * (at your option) any later version.
 */
+#include "..\Submenus\Spooner\CameraPathPlayer.h"
 #include "MenuConfig.h"
 
 #include "..\macros.h"
@@ -109,6 +110,7 @@ void MenuConfig::ConfigRead()
 	BindCameraPathAddKey = ini.GetLongValue(section_general.c_str(), "CameraPathAddKeyButton", BindCameraPathAddKey);
 	BindCameraPathPlay = ini.GetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
 	BindCameraPathStop = ini.GetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
+	sub::Spooner::CameraPaths::SetDefaultEasingIndex(ini.GetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex()));
 	BindBecomePed = ini.GetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
 	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 
@@ -381,6 +383,7 @@ void MenuConfig::SaveConfig()
 	ini.SetLongValue(section_general.c_str(), "CameraPathAddKeyButton", BindCameraPathAddKey);
 	ini.SetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
 	ini.SetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
+	ini.SetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex());
 	ini.SetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
 	ini.SetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 

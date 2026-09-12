@@ -84,6 +84,11 @@ namespace sub::Spooner::CameraPaths
 	// Releases the camera and hands the view back to the game.
 	void Release();
 
+	// Easing a new key gets - from the window, the ] key or POST /camera/keys.
+	// An index into EasingFromIndex, kept in menyooConfig.ini as CameraPathDefaultEasing.
+	int DefaultEasingIndex();
+	void SetDefaultEasingIndex(int index);
+
 	bool IsWindowVisible();
 	void SetWindowVisible(bool visible);
 	void ToggleWindow();

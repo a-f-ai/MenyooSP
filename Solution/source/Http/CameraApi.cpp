@@ -89,7 +89,7 @@ namespace Http::CameraApi
 			}
 
 			key.fov = OptionalNumber(item, "fov", 50.0f);
-			key.easing = EasingFromName(OptionalString(item, "easing", "In-Out Sine"));
+			key.easing = EasingFromName(OptionalString(item, "easing", EasingName(EasingFromIndex(DefaultEasingIndex()))));
 			return key;
 		}
 	}

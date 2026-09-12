@@ -361,6 +361,38 @@ namespace sub::Spooner::CameraPathUI
 					"Smooth, but it takes local control of pacing away.\n"
 					"Off by default; \"Ease ends\" usually does what you want.");
 
+			{
+				// The easing new keys get, and a way to give it to the keys already there.
+				int defaultIndex = DefaultEasingIndex();
+				std::vector<const char*> names;
+				names.reserve(EasingCount());
+				for (int i = 0; i < EasingCount(); ++i)
+					names.push_back(EasingName(EasingFromIndex(i)));
+				ImGui::SetNextItemWidth(150.0f);
+				if (ImGui::Combo("New keys", &defaultIndex, names.data(), static_cast<int>(names.size())))
+					SetDefaultEasingIndex(defaultIndex);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Easing every new key gets: ], Add key at camera, POST /camera/keys.\nSaved in menyooConfig.ini.");
+				ImGui::SameLine();
+				if (ImGui::Button("Apply to all keys"))
+				{
+					for (CameraKey& k : state.path.keys)
+						k.easing = EasingFromIndex(DefaultEasingIndex());
+					state.status = std::string("all keys: ") + EasingName(EasingFromIndex(DefaultEasingIndex()));
+				}
+				ImGui::SameLine();
+				const bool haveSelection = !state.selectedIds.empty();
+				if (!haveSelection) ImGui::BeginDisabled();
+				if (ImGui::Button("Apply to selected"))
+				{
+					int changed = 0;
+					for (CameraKey& k : state.path.keys)
+						if (IsSelected(state, k.id)) { k.easing = EasingFromIndex(DefaultEasingIndex()); ++changed; }
+					state.status = std::to_string(changed) + " selected: " + EasingName(EasingFromIndex(DefaultEasingIndex()));
+				}
+				if (!haveSelection) ImGui::EndDisabled();
+			}
+
 			if (state.path.smoothing == Smoothing::WholePath)
 			{
 				int easingIndex = static_cast<int>(state.path.pathEasing);

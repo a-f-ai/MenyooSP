@@ -3,6 +3,8 @@
 */
 #include "CameraPathPlayer.h"
 
+#include <atomic>
+
 #include "CameraPathFile.h"
 #include "ImGuiSpooner.h"
 #include "SpoonerMode.h"
@@ -107,6 +109,16 @@ namespace sub::Spooner::CameraPaths
 	std::mutex& StateMutex() { return g_mutex; }
 	PlayerState& State() { return g_state; }
 
+	namespace { std::atomic<int> g_defaultEasing{ 0 }; }   // 0 = Linear
+
+	int DefaultEasingIndex() { return g_defaultEasing; }
+	void SetDefaultEasingIndex(int index)
+	{
+		if (index < 0) index = 0;
+		if (index >= EasingCount()) index = EasingCount() - 1;
+		g_defaultEasing = index;
+	}
+
 	bool IsWindowVisible() { return g_windowVisible; }
 
 	void SetWindowVisible(bool visible)
@@ -165,7 +177,7 @@ namespace sub::Spooner::CameraPaths
 			key.position = authorPosition;
 			key.rotation = authorRotation;
 			key.fov = authorFov;
-			key.easing = Easing::Linear;
+			key.easing = EasingFromIndex(DefaultEasingIndex());
 			state.path.AddKey(key);
 			state.selectedKey = state.path.IndexOfId(state.path.keys.back().id);
 			state.selectedIds = { state.path.keys[state.selectedKey].id };
