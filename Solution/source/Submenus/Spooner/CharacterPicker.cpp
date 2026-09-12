@@ -10,6 +10,7 @@
 #include "../../Scripting/Camera.h"
 #include "../../Scripting/GameplayCamera.h"
 #include "../../Scripting/GTAentity.h"
+#include "../../Scripting/GTAvehicle.h"
 #include "../../Scripting/Model.h"
 #include "../../Scripting/Raycast.h"
 #include "../../Scripting/World.h"
@@ -47,6 +48,7 @@ namespace sub::Spooner::CharacterPicker
 		std::atomic<bool> g_cursorMode{ false };
 		char g_filter[64] = "";
 		char g_propName[64] = "";
+		char g_vehicleName[64] = "";
 
 		// A standing ped's origin sits this far above the surface: measured on
 		// 686 of the author's placed peds (tools/calibrate_stand_offsets.py).
@@ -145,8 +147,25 @@ namespace sub::Spooner::CharacterPicker
 			else if (state.loadError.empty())
 				state.loadError = "no PropShortlist.json yet - run tools/palette_to_pedlist.py; typed prop names still work";
 
+			state.vehicles.clear();
+			state.selectedVehicle = -1;
+			if (ReadFile(dir + "VehicleShortlist.json", text))
+			{
+				const json doc = json::parse(text, nullptr, false);
+				if (!doc.is_discarded() && doc.is_object() && doc.contains("vehicles") && doc["vehicles"].is_array())
+				{
+					for (const json& v : doc["vehicles"])
+					{
+						const std::string hex = v.value("hash", "");
+						if (hex.size() < 3) continue;
+						state.vehicles.push_back(VehicleEntry{ v.value("label", hex), std::strtoul(hex.c_str(), nullptr, 16), v.value("placements", 0) });
+					}
+					if (!state.vehicles.empty()) state.selectedVehicle = 0;
+				}
+			}
+
 			addlog(ige::LogType::LOG_INFO, "CharacterPicker: " + std::to_string(state.characters.size()) + " characters, " +
-				std::to_string(state.props.size()) + " shortlisted props");
+				std::to_string(state.props.size()) + " shortlisted props, " + std::to_string(state.vehicles.size()) + " vehicles");
 		}
 
 		// ---- aiming (script thread) ----
@@ -226,9 +245,13 @@ namespace sub::Spooner::CharacterPicker
 			int variantIndex;
 			std::string propModel;
 			unsigned long propHash;
+			std::string vehicleLabel;
+			unsigned long vehicleHash;
+			bool rainbowCars;
 			int count;
 			float spacing;
-			bool fillBySpacing;
+			Fill fill;
+			float gap;
 			Facing facing;
 			float jitter;
 			bool rainbow;
@@ -347,7 +370,76 @@ namespace sub::Spooner::CharacterPicker
 			return true;
 		}
 
-		std::vector<Vector3> SpotsAlong(const Vector3& a, const Vector3& b, int count, bool fill, float spacing)
+		// The box of whatever is about to be spawned; loads the model, since the
+		// game only knows a box for a resident model.
+		Http::ModelApi::Box BoxFor(unsigned long hash)
+		{
+			GTAmodel::Model model(static_cast<Hash>(hash));
+			if (model.IsInCdImage() && !model.IsLoaded())
+				model.Load(3000);
+			return Http::ModelApi::GetBox(hash);
+		}
+
+		// How much of the line one item takes: its box, turned by the yaw it will
+		// stand at, projected onto the line direction.
+		float ExtentAlong(const Http::ModelApi::Box& box, float yawDeg, const Vector3& unit)
+		{
+			const float yaw = static_cast<float>(yawDeg * MATH_PI / 180.0);
+			const Vector3 right(std::cos(yaw), std::sin(yaw), 0.0f);
+			const Vector3 forward(-std::sin(yaw), std::cos(yaw), 0.0f);
+			const float sx = box.max.x - box.min.x, sy = box.max.y - box.min.y;
+			return std::fabs(right.x * unit.x + right.y * unit.y) * sx + std::fabs(forward.x * unit.x + forward.y * unit.y) * sy;
+		}
+
+		struct Rgb { int r, g, b; };
+		const Rgb kCarRainbow[] = { {220,30,30}, {240,120,20}, {240,220,30}, {40,180,60}, {30,190,200}, {40,80,220}, {140,50,200}, {240,80,170} };
+
+		bool SpawnVehicleAt(const PlaceJob& job, int index, Vector3 spot, float yaw, std::vector<int>& placed, std::vector<std::string>& problems)
+		{
+			GTAmodel::Model model(static_cast<Hash>(job.vehicleHash));
+			if (!model.IsInCdImage())
+			{
+				problems.push_back(job.vehicleLabel + ": not in the game files");
+				return false;
+			}
+			const Http::ModelApi::Box box = BoxFor(job.vehicleHash);
+			if (!box.valid)
+			{
+				problems.push_back(job.vehicleLabel + ": the game reports no box for it");
+				return false;
+			}
+			spot.z -= box.min.z;   // wheels on the surface, not the origin
+
+			Http::EntityApi::CreateRequest request{};
+			request.type = 2;
+			request.model = job.vehicleHash;
+			request.modelLabel = job.vehicleLabel;
+			request.name = job.vehicleLabel;
+			request.position = { spot.x, spot.y, spot.z };
+			request.rotation = { 0.0f, 0.0f, yaw };
+			request.dynamic = true;
+			request.snapToGround = false;
+			request.still = false;
+			request.tolerance = 0.25f;
+			request.textureVariation = -1;
+			int id = 0;
+			std::string failure;
+			if (!Http::EntityApi::CreateDirect(request, id, failure))
+			{
+				problems.push_back(job.vehicleLabel + ": " + failure);
+				return false;
+			}
+			if (job.rainbowCars)
+			{
+				const Rgb c = kCarRainbow[index % (sizeof(kCarRainbow) / sizeof(kCarRainbow[0]))];
+				SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(id, c.r, c.g, c.b);
+				SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(id, c.r, c.g, c.b);
+			}
+			placed.push_back(id);
+			return true;
+		}
+
+		std::vector<Vector3> SpotsAlong(const Vector3& a, const Vector3& b, int count, Fill fill, float spacing, float extent, float gap)
 		{
 			std::vector<Vector3> spots;
 			const Vector3 delta = b - a;
@@ -356,7 +448,14 @@ namespace sub::Spooner::CharacterPicker
 			const Vector3 unit = delta * (1.0f / length);
 			int n = count;
 			float start = 0.0f, step = 0.0f;
-			if (fill)
+			if (fill == Fill::Pack)
+			{
+				// Each item owns its own extent plus the gap; as many as fit, centred.
+				step = extent + gap;
+				n = length >= extent && step > 0.001f ? static_cast<int>((length - extent) / step) + 1 : 1;
+				start = extent / 2.0f + (length - (extent + (n - 1) * step)) / 2.0f;
+			}
+			else if (fill == Fill::BySpacing)
 			{
 				n = static_cast<int>(length / spacing) + 1;
 				step = spacing;
@@ -375,18 +474,55 @@ namespace sub::Spooner::CharacterPicker
 			return spots;
 		}
 
+		unsigned long HashOfWhatSpawns(const PlaceJob& job)
+		{
+			if (job.mode == Mode::Props) return job.propHash;
+			if (job.mode == Mode::Vehicles) return job.vehicleHash;
+			return job.character.variants[job.variantIndex].hash;
+		}
+
 		void RunPlace(const PlaceJob& job, const Aim& aim)
 		{
+			const float yawRad = static_cast<float>(aim.cameraYaw * MATH_PI / 180.0);
+			const Vector3 right(std::cos(yawRad), std::sin(yawRad), 0.0f);
+
+			// Packing needs the box of the thing and the direction it lies along.
+			float extent = job.spacing;
+			Vector3 unit = right;
+			if (job.alongLine)
+			{
+				const Vector3 d = job.lineB - job.lineA;
+				if (d.Length() > 0.001f) { unit = d; unit.Normalize(); }
+			}
+			if (job.fill == Fill::Pack)
+			{
+				const Http::ModelApi::Box box = BoxFor(HashOfWhatSpawns(job));
+				if (!box.valid)
+				{
+					std::lock_guard<std::mutex> lock(g_mutex);
+					g_state.status = "pack: the game reports no box for this model, so its size is unknown - use count or spacing";
+					return;
+				}
+				// The yaw items will stand at, without jitter: facing the camera from the
+				// middle of the run is close enough for the size of a footprint.
+				const Vector3 mid = job.alongLine ? (job.lineA + job.lineB) * 0.5f : aim.point;
+				float yaw = aim.cameraYaw;
+				if (job.facing == Facing::TowardCamera) yaw = YawToward(mid, aim.cameraPosition);
+				if (job.facing == Facing::AwayFromCamera) yaw = YawToward(aim.cameraPosition, mid);
+				if (job.facing == Facing::AcrossLine) yaw = static_cast<float>(std::atan2(-(-unit.y), unit.x) * 180.0 / MATH_PI);
+				extent = ExtentAlong(box, yaw, unit);
+				if (extent < 0.05f) extent = 0.05f;
+			}
+
 			std::vector<Vector3> spots;
 			if (job.alongLine)
-				spots = SpotsAlong(job.lineA, job.lineB, job.count, job.fillBySpacing, job.spacing);
+				spots = SpotsAlong(job.lineA, job.lineB, job.count, job.fill, job.spacing, extent, job.gap);
 			else
 			{
-				// A row across the view, centred on the aim.
-				const float yawRad = static_cast<float>(aim.cameraYaw * MATH_PI / 180.0);
-				const Vector3 right(std::cos(yawRad), std::sin(yawRad), 0.0f);
-				const float half = static_cast<float>(job.count - 1) / 2.0f * job.spacing;
-				spots = SpotsAlong(aim.point - right * half, aim.point + right * half, job.count, false, job.spacing);
+				// A row across the view, centred on the aim; packed rows step by the box.
+				const float step = job.fill == Fill::Pack ? extent + job.gap : job.spacing;
+				const float half = static_cast<float>(job.count - 1) / 2.0f * step;
+				spots = SpotsAlong(aim.point - right * half, aim.point + right * half, job.count, Fill::Count, step, extent, job.gap);
 			}
 
 			std::mt19937 rng(static_cast<unsigned>(GetTickCount()));
@@ -441,6 +577,11 @@ namespace sub::Spooner::CharacterPicker
 					SpawnPropAt(job, i, spot, yaw, placed, problems);
 					continue;
 				}
+				if (job.mode == Mode::Vehicles)
+				{
+					SpawnVehicleAt(job, i, spot, yaw, placed, problems);
+					continue;
+				}
 				const Variant& variant = rainbowOn
 					? *colours[(job.variantIndex + i) % colours.size()]
 					: job.character.variants[job.variantIndex];
@@ -454,8 +595,9 @@ namespace sub::Spooner::CharacterPicker
 				g_state.lastPlaced = placed;
 				g_state.placedTotal += static_cast<int>(placed.size());
 			}
-			const std::string what = job.mode == Mode::Props ? job.propModel : job.character.label;
-			g_state.status = "placed " + std::to_string(placed.size()) + " x " + what;
+			const std::string what = job.mode == Mode::Props ? job.propModel : job.mode == Mode::Vehicles ? job.vehicleLabel : job.character.label;
+			g_state.status = "placed " + std::to_string(placed.size()) + " x " + what +
+				(job.fill == Fill::Pack ? " (packed, " + std::to_string(extent).substr(0, 4) + " m each + gap)" : "");
 			if (textureSlots > 0)
 				g_state.status += " (textures on this model: " + std::to_string(textureSlots) + ")";
 			if (!problems.empty())
@@ -519,6 +661,12 @@ namespace sub::Spooner::CharacterPicker
 				if (IsKeyJustUp(VirtualKey::Down)) { state.selectedProp = (state.selectedProp + 1) % n; state.customProp.clear(); }
 				if (IsKeyJustUp(VirtualKey::Up))   { state.selectedProp = (state.selectedProp + n - 1) % n; state.customProp.clear(); }
 			}
+			if (state.mode == Mode::Vehicles && !state.vehicles.empty())
+			{
+				const int n = static_cast<int>(state.vehicles.size());
+				if (IsKeyJustUp(VirtualKey::Down)) { state.selectedVehicle = (state.selectedVehicle + 1) % n; state.customVehicle.clear(); }
+				if (IsKeyJustUp(VirtualKey::Up))   { state.selectedVehicle = (state.selectedVehicle + n - 1) % n; state.customVehicle.clear(); }
+			}
 			if (IsKeyJustUp(VirtualKey::Return)) state.requestPlace = true;
 			if (IsKeyJustUp(VirtualKey::N1)) state.requestSetA = true;
 			if (IsKeyJustUp(VirtualKey::N2)) state.requestSetB = true;
@@ -530,7 +678,9 @@ namespace sub::Spooner::CharacterPicker
 			job.mode = state.mode;
 			job.count = std::clamp(state.count, 1, 60);
 			job.spacing = state.spacing;
-			job.fillBySpacing = state.fillBySpacing;
+			job.fill = state.fill;
+			job.gap = std::clamp(state.gap, 0.0f, 10.0f);
+			job.rainbowCars = state.rainbowCars;
 			job.facing = state.facing;
 			job.jitter = state.jitter;
 			job.rainbow = state.rainbow;
@@ -549,6 +699,23 @@ namespace sub::Spooner::CharacterPicker
 				}
 				job.character = state.characters[state.selectedCharacter];
 				job.variantIndex = std::clamp(state.selectedVariant, 0, static_cast<int>(job.character.variants.size()) - 1);
+				return true;
+			}
+			if (state.mode == Mode::Vehicles)
+			{
+				if (!state.customVehicle.empty())
+				{
+					job.vehicleLabel = state.customVehicle;
+					job.vehicleHash = GET_HASH_KEY(state.customVehicle.c_str());
+					return true;
+				}
+				if (state.selectedVehicle < 0 || state.selectedVehicle >= static_cast<int>(state.vehicles.size()))
+				{
+					problem = "pick a vehicle from the list or type a model name";
+					return false;
+				}
+				job.vehicleLabel = state.vehicles[state.selectedVehicle].label;
+				job.vehicleHash = state.vehicles[state.selectedVehicle].hash;
 				return true;
 			}
 			if (!state.customProp.empty())
@@ -747,6 +914,7 @@ namespace sub::Spooner::CharacterPicker
 		int mode = static_cast<int>(state.mode);
 		ImGui::RadioButton("Peds", &mode, 0); ImGui::SameLine();
 		ImGui::RadioButton("Props", &mode, 1); ImGui::SameLine();
+		ImGui::RadioButton("Vehicles", &mode, 2); ImGui::SameLine();
 		state.mode = static_cast<Mode>(mode);
 		ImGui::SetNextItemWidth(200.0f);
 		ImGui::InputTextWithHint("##filter", "filter...", g_filter, sizeof(g_filter));
@@ -764,6 +932,17 @@ namespace sub::Spooner::CharacterPicker
 				char row[128];
 				std::snprintf(row, sizeof(row), "%s  (%d)##c%d", c.label.c_str(), static_cast<int>(c.variants.size()), i);
 				if (ImGui::Selectable(row, state.selectedCharacter == i)) { state.selectedCharacter = i; state.selectedVariant = 0; }
+			}
+		}
+		else if (state.mode == Mode::Vehicles)
+		{
+			for (int i = 0; i < static_cast<int>(state.vehicles.size()); ++i)
+			{
+				const VehicleEntry& v = state.vehicles[i];
+				if (!needle.empty() && Lower(v.label).find(needle) == std::string::npos) continue;
+				char row[160];
+				std::snprintf(row, sizeof(row), "%s  (%d)##veh%d", v.label.c_str(), v.placements, i);
+				if (ImGui::Selectable(row, state.selectedVehicle == i && state.customVehicle.empty())) { state.selectedVehicle = i; state.customVehicle.clear(); g_vehicleName[0] = 0; }
 			}
 		}
 		else
@@ -803,6 +982,18 @@ namespace sub::Spooner::CharacterPicker
 			}
 			else ImGui::TextDisabled("pick a character on the left");
 		}
+		else if (state.mode == Mode::Vehicles)
+		{
+			ImGui::Text("Vehicle");
+			ImGui::SetNextItemWidth(-1.0f);
+			if (ImGui::InputTextWithHint("##vehname", "or type a model name: bati, sanchez, buzzard", g_vehicleName, sizeof(g_vehicleName)))
+				state.customVehicle = g_vehicleName;
+			if (!state.customVehicle.empty()) ImGui::TextDisabled("typed: %s", state.customVehicle.c_str());
+			else if (state.selectedVehicle >= 0 && state.selectedVehicle < static_cast<int>(state.vehicles.size()))
+				ImGui::TextDisabled("from the list: %s", state.vehicles[state.selectedVehicle].label.c_str());
+			ImGui::TextWrapped("The list is the author's own vocabulary: the vehicles the saved maps use most. Wheels go on the surface; vehicles are dynamic.");
+			ImGui::Checkbox("rainbow colours: body colour walks red, orange, yellow, green, cyan, blue, purple, pink", &state.rainbowCars);
+		}
 		else
 		{
 			ImGui::Text("Prop");
@@ -834,8 +1025,15 @@ namespace sub::Spooner::CharacterPicker
 		}
 
 		ImGui::Separator();
+		int fill = static_cast<int>(state.fill);
+		ImGui::TextDisabled("fill:"); ImGui::SameLine();
+		ImGui::RadioButton("count", &fill, 0); ImGui::SameLine();
+		ImGui::RadioButton("by spacing", &fill, 1); ImGui::SameLine();
+		ImGui::RadioButton("pack by size + gap", &fill, 2);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Each item takes its own box (turned as it will stand) plus the gap.\nOn a line: as many as fit between A and B. In a row: count items, stepped by the box.");
+		state.fill = static_cast<Fill>(fill);
 		ImGui::SetNextItemWidth(150.0f); ImGui::SliderInt("count", &state.count, 1, 60);
-		ImGui::SameLine(); ImGui::Checkbox("fill A-B by spacing", &state.fillBySpacing);
+		ImGui::SameLine(); ImGui::SetNextItemWidth(120.0f); ImGui::SliderFloat("gap m", &state.gap, 0.0f, 5.0f, "%.2f");
 		ImGui::SetNextItemWidth(150.0f); ImGui::SliderFloat("spacing m", &state.spacing, 0.3f, 6.0f, "%.2f");
 		ImGui::SetNextItemWidth(150.0f); ImGui::SliderFloat("yaw jitter", &state.jitter, 0.0f, 45.0f, "%.0f deg");
 		int facing = static_cast<int>(state.facing);

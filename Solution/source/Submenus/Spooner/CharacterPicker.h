@@ -36,7 +36,10 @@ namespace sub::Spooner::CharacterPicker
 	};
 
 	enum class Facing { TowardCamera, AwayFromCamera, SameAsCamera, AcrossLine };
-	enum class Mode { Peds, Props };
+	enum class Mode { Peds, Props, Vehicles };
+	// How a line A-B (or a row) is filled: exactly count, as many as fit at spacing,
+	// or packed by the spawned thing's own box plus a gap.
+	enum class Fill { Count, BySpacing, Pack };
 
 	struct PropEntry
 	{
@@ -47,12 +50,20 @@ namespace sub::Spooner::CharacterPicker
 		                            // count is baked into the model and cannot be queried
 	};
 
+	struct VehicleEntry
+	{
+		std::string label;   // the author's name for it in the maps
+		unsigned long hash;
+		int placements;
+	};
+
 	struct Point3 { float x = 0.0f, y = 0.0f, z = 0.0f; };
 
 	struct State
 	{
 		std::vector<Character> characters;   // sorted by label
 		std::vector<PropEntry> props;        // the author's shortlist, most used first
+		std::vector<VehicleEntry> vehicles;  // likewise
 		bool loaded = false;
 		std::string loadError;               // non-empty: why a list is empty
 		std::string status;
@@ -62,6 +73,9 @@ namespace sub::Spooner::CharacterPicker
 		int selectedVariant = 0;
 		int selectedProp = -1;
 		std::string customProp;              // a typed model name wins over the list
+		int selectedVehicle = -1;
+		std::string customVehicle;
+		bool rainbowCars = true;             // body colour walks a palette along the row
 
 		int count = 1;
 		float spacing = 0.9f;
@@ -88,7 +102,8 @@ namespace sub::Spooner::CharacterPicker
 		// Two points and a line between them.
 		bool hasA = false, hasB = false;
 		Point3 pointA, pointB;
-		bool fillBySpacing = false;
+		Fill fill = Fill::Count;
+		float gap = 0.3f;                    // Pack: air between neighbours' boxes
 
 		// Raised by the window or the keyboard, cleared by the script thread.
 		bool requestReload = false;
