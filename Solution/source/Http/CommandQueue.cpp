@@ -5,6 +5,7 @@
 
 #include "../Util/FileLogger.h"
 
+#include <string>
 #include <utility>
 
 namespace Http
@@ -63,13 +64,28 @@ namespace Http
 			batch.swap(m_pending);
 		}
 
-		// No try/catch here on purpose. Commands are written not to throw,
-		// because an exception raised on this fiber is fatal to the script
-		// regardless of who catches it (see ApiError.h). A handler here would
-		// only hide that contract being broken.
+		// Commands are written not to throw: an exception on this fiber kills
+		// the script regardless of who catches it (see ApiError.h). This does
+		// not change that - it rethrows - it only writes down what was thrown
+		// first, so the log names the cause instead of a bare clr.dll address.
+		// An access violation inside a native is not a C++ exception and will
+		// not pass through here; no line in the log then means exactly that.
 		for (auto& command : batch)
 		{
-			command->result.set_value(command->run());
+			try
+			{
+				command->result.set_value(command->run());
+			}
+			catch (const std::exception& error)
+			{
+				addlog(ige::LogType::LOG_ERROR, std::string("a command threw on the game thread: ") + error.what());
+				throw;
+			}
+			catch (...)
+			{
+				addlog(ige::LogType::LOG_ERROR, "a command threw a non-std exception on the game thread");
+				throw;
+			}
 		}
 
 		std::lock_guard<std::mutex> lock(m_mutex);

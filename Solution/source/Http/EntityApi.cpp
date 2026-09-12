@@ -15,6 +15,7 @@
 #include "../Scripting/Model.h"
 #include "../Scripting/Tasks.h"
 #include "../Scripting/World.h"
+#include "../Util/FileLogger.h"
 #include "../Util/GTAmath.h"
 #include "../Util/StringManip.h"
 #include "../Submenus/Spooner/Databases.h"
@@ -135,6 +136,12 @@ namespace Http::EntityApi
 		// out by its map save.
 		bool Spawn(const CreateRequest& request, SpoonerEntity& out, std::string& failure)
 		{
+			// Written before anything touches the model: when a spawn kills the
+			// script, this is the line that says which model did it.
+			addlog(ige::LogType::LOG_INFO, "spawn type " + std::to_string(request.type) + " model " +
+				(request.modelLabel.empty() ? IntToHexString(request.model, true) : request.modelLabel) +
+				" (" + IntToHexString(request.model, true) + ")");
+
 			Vector3 position(request.position.x, request.position.y, request.position.z);
 			const Vector3 rotation(request.rotation.x, request.rotation.y, request.rotation.z);
 
