@@ -83,12 +83,14 @@ namespace Http::ModelApi
 				hi = world;
 				continue;
 			}
-			lo.x = std::min(lo.x, world.x);
-			lo.y = std::min(lo.y, world.y);
-			lo.z = std::min(lo.z, world.z);
-			hi.x = std::max(hi.x, world.x);
-			hi.y = std::max(hi.y, world.y);
-			hi.z = std::max(hi.z, world.z);
+			// Written out rather than with std::min/std::max: Windows.h is in
+			// this translation unit without NOMINMAX, so those names are macros.
+			if (world.x < lo.x) lo.x = world.x;
+			if (world.y < lo.y) lo.y = world.y;
+			if (world.z < lo.z) lo.z = world.z;
+			if (world.x > hi.x) hi.x = world.x;
+			if (world.y > hi.y) hi.y = world.y;
+			if (world.z > hi.z) hi.z = world.z;
 		}
 
 		target["bounds"] = json{ { "min", Point(lo) }, { "max", Point(hi) } };
