@@ -17,6 +17,7 @@
 #include "..\Http\HttpServer.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
 #include "..\Submenus\Spooner\CharacterPicker.h"
+#include "..\Misc\PedLod.h"
 #include "..\Submenus\Spooner\SpoonerEntity.h"
 #include "..\Submenus\Spooner\SpoonerMode.h"
 #include "..\Submenus\Spooner\ImGuiSpooner.h"
@@ -286,6 +287,7 @@ inline void MenyooMain()
 				sub::Spooner::CameraPaths::State().requestStop = true;
 			}
 		}
+		PedLod::Tick();
 		sub::Spooner::CharacterPicker::Tick();
 		sub::Spooner::CameraPaths::Tick();
 		Http::Server::DrainCommands();

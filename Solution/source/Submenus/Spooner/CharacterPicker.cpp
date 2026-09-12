@@ -21,6 +21,7 @@
 #include "../../Util/StringManip.h"
 #include "../../Http/EntityApi.h"
 #include "../../Http/ModelApi.h"
+#include "../../Misc/PedLod.h"
 
 #include "imgui.h"
 #include <json/single_include/nlohmann/json.hpp>
@@ -1060,6 +1061,16 @@ namespace sub::Spooner::CharacterPicker
 			ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.4f, 1.0f), "aim: %s", state.aimProblem.c_str());
 		if (!state.status.empty())
 			ImGui::TextWrapped("%s", state.status.c_str());
+
+		ImGui::Separator();
+		float lodMultiplier = PedLod::Multiplier();
+		ImGui::SetNextItemWidth(150.0f);
+		if (ImGui::SliderFloat("ped detail distance x", &lodMultiplier, PedLod::kGameDefault, PedLod::kMax, "%.0f"))
+			PedLod::SetMultiplier(lodMultiplier);
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("How much further out than the game would every ped keeps its full mesh.\n"
+				"Addon peds drop to auto-generated blobs otherwise. 1 = the game's own distances.\n"
+				"Applies to every ped in the world; kept in menyooConfig.ini as PedLodMultiplier.");
 
 		// A click in the world, not on the window, while the window owns the mouse.
 		if (IsCursorMode() && !io.WantCaptureMouse && io.MouseClicked[0])

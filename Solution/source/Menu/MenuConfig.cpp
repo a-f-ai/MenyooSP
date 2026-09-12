@@ -8,6 +8,7 @@
 * (at your option) any later version.
 */
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Misc\PedLod.h"
 #include "MenuConfig.h"
 
 #include "..\macros.h"
@@ -113,6 +114,7 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::CameraPaths::SetDefaultEasingIndex(ini.GetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex()));
 	BindBecomePed = ini.GetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
 	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
+	PedLod::SetMultiplier((float)ini.GetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier()));
 
 
 	std::string section_colours = "colours";/////////
@@ -386,6 +388,7 @@ void MenuConfig::SaveConfig()
 	ini.SetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex());
 	ini.SetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
 	ini.SetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
+	ini.SetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier());
 
 
 	std::string section_colours = "colours";/////////
