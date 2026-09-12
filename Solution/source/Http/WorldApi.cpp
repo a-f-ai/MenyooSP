@@ -14,18 +14,25 @@
 #include "../Scripting/GTAprop.h"
 #include "../Scripting/GTAvehicle.h"
 #include "../Scripting/Model.h"
+#include "../Scripting/Raycast.h"
 #include "../Scripting/ModelNames.h"
 #include "../Scripting/World.h"
 #include "../Util/GTAmath.h"
 #include "../Util/StringManip.h"
+#include "../Submenus/Spooner/Databases.h"
+#include "../Submenus/Spooner/SpoonerEntity.h"
 #include "../Submenus/Spooner/SpoonerMode.h"
 
 #include <json/single_include/nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
 using json = nlohmann::json;
+using sub::Spooner::SpoonerEntity;
+using sub::Spooner::Databases::EntityDb;
 
 namespace Http::WorldApi
 {
@@ -51,6 +58,86 @@ namespace Http::WorldApi
 		json Angles(const Vector3& v)
 		{
 			return json{ { "pitch", v.x }, { "roll", v.y }, { "yaw", v.z } };
+		}
+
+		json DescribeHitEntity(GTAentity entity)
+		{
+			const int handle = entity.GetHandle();
+			json described{
+				{ "id", handle },
+				{ "model", IntToHexString(entity.Model().hash, true) },
+			};
+
+			switch (GET_ENTITY_TYPE(handle))
+			{
+			case 1:  described["type"] = "ped"; break;
+			case 2:  described["type"] = "vehicle"; break;
+			case 3:  described["type"] = "prop"; break;
+			default: described["type"] = "unknown"; break;
+			}
+
+			const auto placed = std::find_if(EntityDb.begin(), EntityDb.end(),
+				[handle](const SpoonerEntity& candidate) {
+					return candidate.handle.GetHandle() == handle;
+				});
+			if (placed != EntityDb.end())
+				described["name"] = placed->hashName;
+
+			return described;
+		}
+
+		struct Hit
+		{
+			int status;
+			json payload;
+		};
+
+		// The probe answers three different questions and they must not be
+		// confused: it failed to run, it ran and hit nothing, it ran and hit
+		// something. Only the last one carries a point.
+		Hit DescribeHit(const RaycastResult& result, const Vector3& from)
+		{
+			// GET_SHAPE_TEST_RESULT reports 2 when the probe has an answer.
+			// Anything else means the fields below hold nothing meaningful.
+			if (result.Result() != 2)
+			{
+				return Hit{ 503, json{ { "error",
+					"the shape test did not resolve this frame (status " +
+					std::to_string(result.Result()) + "); the area is probably not streamed in" } } };
+			}
+
+			if (!result.DidHitAnything())
+			{
+				return Hit{ 200, json{
+					{ "hit", false },
+					{ "note", "the ray reached its end without touching anything" },
+				} };
+			}
+
+			const Vector3 point = result.HitCoords();
+			const Vector3 normal = result.SurfaceNormal();
+
+			float upness = normal.z;
+			if (upness > 1.0f) upness = 1.0f;
+			if (upness < -1.0f) upness = -1.0f;
+
+			json payload{
+				{ "hit", true },
+				{ "point", Point(point) },
+				{ "normal", Point(normal) },
+				{ "distance", (point - from).Length() },
+				// 0 is a surface you could stand on, 90 a vertical wall,
+				// 180 the underside of something.
+				{ "slopeDegrees", std::acos(upness) * 180.0f / static_cast<float>(MATH_PI) },
+			};
+
+			GTAentity hit = result.HitEntity();
+			if (hit.Exists())
+				payload["entity"] = DescribeHitEntity(hit);
+			else
+				payload["entity"] = nullptr;
+
+			return Hit{ 200, std::move(payload) };
 		}
 	}
 
@@ -129,21 +216,47 @@ namespace Http::WorldApi
 		});
 	}
 
-	Response Raycast(float maxDistance)
+	Response Aim(float maxDistance)
 	{
 		auto& spoonerCam = sub::Spooner::SpoonerMode::spoonerModeCamera;
-		if (!spoonerCam.IsActive())
-		{
-			return Fail(409, "the spooner camera is not active; open Object Spooner in Menyoo, "
-				"or use /world/player and /world/ground to pick a point instead");
-		}
+		const bool spooner = spoonerCam.IsActive();
 
-		const Vector3 hit = spoonerCam.RaycastForCoord(Vector2(0.0f, 0.0f), 0, maxDistance, maxDistance);
-		return Ok(json{
-			{ "point", Point(hit) },
-			{ "cameraPosition", Point(spoonerCam.GetPosition()) },
-			{ "maxDistance", maxDistance },
-		});
+		const Vector3 from = spooner ? spoonerCam.GetPosition() : GameplayCamera::GetPosition();
+		Vector3 direction = spooner ? spoonerCam.GetDirection() : GameplayCamera::GetDirection();
+		direction.Normalize();
+
+		// Menyoo's Camera::RaycastForCoord is not usable here: when the ray
+		// touches nothing it returns a made-up point at failDistance, which
+		// reads exactly like a hit.
+		const RaycastResult result = RaycastResult::Raycast(from, from + (direction * maxDistance),
+			IntersectOptions::Everything);
+
+		Hit described = DescribeHit(result, from);
+		if (described.status != 200)
+			return Response{ described.status, Serialise(described.payload) };
+
+		described.payload["from"] = Point(from);
+		described.payload["direction"] = Point(direction);
+		described.payload["maxDistance"] = maxDistance;
+		described.payload["camera"] = spooner ? "spooner" : "gameplay";
+		return Ok(described.payload);
+	}
+
+	Response Raycast(const RayRequest& request)
+	{
+		const Vector3 from(request.fromX, request.fromY, request.fromZ);
+		const Vector3 to(request.toX, request.toY, request.toZ);
+
+		const RaycastResult result = RaycastResult::Raycast(from, to,
+			static_cast<IntersectOptions>(request.flags), request.ignoreEntity);
+
+		Hit described = DescribeHit(result, from);
+		if (described.status != 200)
+			return Response{ described.status, Serialise(described.payload) };
+
+		described.payload["from"] = Point(from);
+		described.payload["to"] = Point(to);
+		return Ok(described.payload);
 	}
 
 	Response GetNearby(float x, float y, float z, float radius, const std::string& type, int limit)

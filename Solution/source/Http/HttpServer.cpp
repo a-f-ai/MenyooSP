@@ -20,10 +20,12 @@
 #include "WorldApi.h"
 
 #include "../Natives/natives2.h"
+#include "../Scripting/Raycast.h"
 #include "../Util/FileLogger.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -176,6 +178,68 @@ namespace Http::Server
 					" models per request, got " + std::to_string(models.size()) +
 					"; every one of them has to be streamed in to be measured");
 			return models;
+		}
+
+		// Named rather than a raw bitmask: a caller reading "map" knows what it
+		// asked for, and a caller reading "1" does not.
+		int ParseIntersectFlags(const json& body)
+		{
+			if (!body.contains("include"))
+				return static_cast<int>(IntersectOptions::Map);
+
+			const json& value = body.at("include");
+			if (!value.is_array())
+				throw ApiError(400, "\"include\" must be an array of surface kinds");
+
+			int flags = 0;
+			for (const auto& item : value)
+			{
+				if (!item.is_string())
+					throw ApiError(400, "\"include\" entries must be strings");
+
+				const std::string kind = item.get<std::string>();
+				if (kind == "everything") return static_cast<int>(IntersectOptions::Everything);
+				else if (kind == "map")      flags |= static_cast<int>(IntersectOptions::Map);
+				else if (kind == "vehicles") flags |= static_cast<int>(IntersectOptions::Mission_Entities);
+				else if (kind == "peds")     flags |= static_cast<int>(IntersectOptions::Peds1);
+				else if (kind == "objects")  flags |= static_cast<int>(IntersectOptions::Objects);
+				else if (kind == "foliage")  flags |= static_cast<int>(IntersectOptions::Vegetation);
+				else throw ApiError(400, "unknown \"include\" entry \"" + kind +
+					"\"; use map, vehicles, peds, objects, foliage or everything");
+			}
+
+			if (flags == 0)
+				throw ApiError(400, "\"include\" held no surface kinds");
+			return flags;
+		}
+
+		WorldApi::RayRequest ParseRay(const json& body)
+		{
+			const json& from = Field(body, "from");
+			const json& to = Field(body, "to");
+			if (!from.is_object() || !to.is_object())
+				throw ApiError(400, "\"from\" and \"to\" must both be objects with x, y and z");
+
+			WorldApi::RayRequest ray{};
+			ray.fromX = Number(from, "x");
+			ray.fromY = Number(from, "y");
+			ray.fromZ = Number(from, "z");
+			ray.toX = Number(to, "x");
+			ray.toY = Number(to, "y");
+			ray.toZ = Number(to, "z");
+			ray.flags = ParseIntersectFlags(body);
+			ray.ignoreEntity = OptionalInt(body, "ignoreEntity", 0);
+
+			const float dx = ray.toX - ray.fromX;
+			const float dy = ray.toY - ray.fromY;
+			const float dz = ray.toZ - ray.fromZ;
+			const float length = std::sqrt(dx * dx + dy * dy + dz * dz);
+			if (length < 0.001f)
+				throw ApiError(400, "\"from\" and \"to\" are the same point");
+			if (length > 2000.0f)
+				throw ApiError(400, "the ray is " + std::to_string(length) +
+					" metres long; keep it under 2000");
+			return ray;
 		}
 
 		int ParseType(const json& body)
@@ -349,7 +413,9 @@ namespace Http::Server
 					"GET /world/player     where the player is, plus the ground height under them",
 					"GET /world/camera     gameplay camera, and the spooner camera when it is on",
 					"GET /world/ground?x=&y=&z=   the surface below a point",
-					"GET /world/aim?maxDistance=  where the spooner camera points (409 if spooner mode is off)",
+					"GET /world/aim?maxDistance=  what the camera is looking at; \"hit\":false when it is pointed at nothing",
+					"POST /world/raycast  {from:{x,y,z}, to:{x,y,z}, include?:[map|vehicles|peds|objects|foliage|everything], ignoreEntity?}",
+					"     the only way to see static map geometry - a building is not an entity and /world/nearby cannot see it",
 					"GET /world/nearby?x=&y=&z=&radius=&type=&limit=  world entities near a point",
 				}) },
 				{ "catalog", json::array({
@@ -549,7 +615,14 @@ namespace Http::Server
 			server.Get("/world/aim", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request& req) {
 					const float maxDistance = FloatParam(req, "maxDistance", 160.0f);
-					return std::function<Response()>([maxDistance] { return WorldApi::Raycast(maxDistance); });
+					return std::function<Response()>([maxDistance] { return WorldApi::Aim(maxDistance); });
+				});
+			});
+
+			server.Post("/world/raycast", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const WorldApi::RayRequest ray = ParseRay(ParseObjectBody(req));
+					return std::function<Response()>([ray] { return WorldApi::Raycast(ray); });
 				});
 			});
 

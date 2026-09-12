@@ -18,8 +18,22 @@ namespace Http::WorldApi
 	// Casts down from (x, y, probeZ) and reports the first surface below.
 	Response GetGround(float x, float y, float probeZ);
 
-	// Where the spooner camera is pointing. Requires spooner mode to be on.
-	Response Raycast(float maxDistance);
+	// Where the camera is pointing: the spooner camera when it is up, the
+	// gameplay camera otherwise.
+	Response Aim(float maxDistance);
+
+	struct RayRequest
+	{
+		float fromX, fromY, fromZ;
+		float toX, toY, toZ;
+		int flags;         // IntersectOptions bits; what the probe is allowed to hit
+		int ignoreEntity;  // 0 for none
+	};
+
+	// A line probe against the world, static map geometry included. This is the
+	// only way to see a wall, a roof or a slope: /world/nearby lists entities,
+	// and a building is not an entity.
+	Response Raycast(const RayRequest& request);
 
 	Response GetNearby(float x, float y, float z, float radius, const std::string& type, int limit);
 }
