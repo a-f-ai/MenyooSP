@@ -42,7 +42,9 @@ namespace sub::Spooner::CharacterPicker
 	{
 		std::string model;
 		unsigned long hash;
-		int placements;   // how often the author's maps use it
+		int placements;             // how often the author's maps use it
+		std::vector<int> tintsUsed; // TextureVariation values the author set on it; the real
+		                            // count is baked into the model and cannot be queried
 	};
 
 	struct Point3 { float x = 0.0f, y = 0.0f, z = 0.0f; };

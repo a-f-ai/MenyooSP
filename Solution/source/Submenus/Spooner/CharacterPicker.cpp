@@ -132,7 +132,10 @@ namespace sub::Spooner::CharacterPicker
 					{
 						const std::string hex = p.value("hash", "");
 						if (hex.size() < 3) continue;
-						state.props.push_back(PropEntry{ p.value("model", hex), std::strtoul(hex.c_str(), nullptr, 16), p.value("placements", 0) });
+						PropEntry entry{ p.value("model", hex), std::strtoul(hex.c_str(), nullptr, 16), p.value("placements", 0), {} };
+						if (p.contains("tintsUsed") && p["tintsUsed"].is_array())
+							for (const json& t : p["tintsUsed"]) if (t.is_number_integer()) entry.tintsUsed.push_back(t.get<int>());
+						state.props.push_back(std::move(entry));
 					}
 					if (!state.props.empty()) state.selectedProp = 0;
 				}
@@ -771,7 +774,12 @@ namespace sub::Spooner::CharacterPicker
 				if (!needle.empty() && Lower(p.model).find(needle) == std::string::npos) continue;
 				char row[160];
 				std::snprintf(row, sizeof(row), "%s  (%d)##p%d", p.model.c_str(), p.placements, i);
-				if (ImGui::Selectable(row, state.selectedProp == i && state.customProp.empty())) { state.selectedProp = i; state.customProp.clear(); g_propName[0] = 0; }
+				if (ImGui::Selectable(row, state.selectedProp == i && state.customProp.empty()))
+				{
+					state.selectedProp = i; state.customProp.clear(); g_propName[0] = 0;
+					state.tintCount = p.tintsUsed.empty() ? 1 : *std::max_element(p.tintsUsed.begin(), p.tintsUsed.end()) + 1;
+					state.tint = 0;
+				}
 			}
 		}
 		ImGui::EndChild();
@@ -806,11 +814,23 @@ namespace sub::Spooner::CharacterPicker
 				ImGui::TextDisabled("from the list: %s", state.props[state.selectedProp].model.c_str());
 			ImGui::TextWrapped("The list is the author's own vocabulary: the 150 props the saved maps use most. Props are frozen and put down on their bottom face.");
 			ImGui::Separator();
+			const PropEntry* chosen = (state.customProp.empty() && state.selectedProp >= 0 && state.selectedProp < static_cast<int>(state.props.size()))
+				? &state.props[state.selectedProp] : nullptr;
+			if (chosen != nullptr && !chosen->tintsUsed.empty())
+			{
+				std::string seen;
+				for (int t : chosen->tintsUsed) seen += (seen.empty() ? "" : " ") + std::to_string(t);
+				ImGui::Text("tints seen in your maps: %s", seen.c_str());
+			}
+			else if (chosen != nullptr)
+				ImGui::TextDisabled("no tint ever set on this model in your maps - it may have none");
+			else
+				ImGui::TextDisabled("typed model: tint range unknown; only what you have seen work is safe");
 			ImGui::SetNextItemWidth(120.0f); ImGui::SliderInt("tint", &state.tint, 0, 31);
 			ImGui::SameLine(); ImGui::Checkbox("cycle tints", &state.cycleTints);
-			ImGui::SameLine(); ImGui::SetNextItemWidth(90.0f); ImGui::SliderInt("of", &state.tintCount, 2, 32);
+			ImGui::SameLine(); ImGui::SetNextItemWidth(90.0f); ImGui::SliderInt("of", &state.tintCount, 1, 32);
 			if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-				ImGui::SetTooltip("TextureVariation: the colour of stunt blocks and tubes.\nbkr_prop_biker_bblock_* and the stunt tubes use 0..16 in the author's maps.\nWith cycle on, a row walks through the tints and the next click carries on.");
+				ImGui::SetTooltip("TextureVariation: the colour of stunt blocks and tubes.\nHow many a model really has is baked into it and cannot be asked;\n'of' is preset to the highest value you ever used on it plus one.\nWith cycle on, a row walks through the tints and the next click carries on.");
 		}
 
 		ImGui::Separator();
