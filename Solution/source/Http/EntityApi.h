@@ -39,6 +39,20 @@ namespace Http::EntityApi
 		std::string scenario;  // peds only
 		std::string animDict;  // peds only
 		std::string animName;  // peds only
+		// The surface the caller believes is under the entity. When set, the spawn
+		// casts down from the final position and refuses if the surface it finds is
+		// further than `tolerance` from this - the difference between "stood on the
+		// platform" and "fell through to the deck below", which is otherwise invisible.
+		std::optional<float> expectedSupportZ;
+		float tolerance;
+	};
+
+	struct SettleQuery
+	{
+		std::string namePrefix;
+		std::string type;
+		int frames;      // how long to let physics act
+		float epsilon;   // metres of movement that count as "moved"
 	};
 
 	struct PatchRequest
@@ -66,4 +80,8 @@ namespace Http::EntityApi
 	Response PatchEntity(int id, const PatchRequest& request);
 	Response DeleteEntity(int id);
 	Response DeleteMatching(const std::string& namePrefix, const std::string& type);
+
+	// Waits `frames` frames and reports which matching entities moved. A measurement
+	// only: nothing is corrected, so a hovering or sinking ped shows up as movement.
+	Response Settle(const SettleQuery& query);
 }

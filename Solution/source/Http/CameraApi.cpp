@@ -9,6 +9,7 @@
 #include "../Submenus/Spooner/CameraPathFile.h"
 #include "../Submenus/Spooner/CameraPathPlayer.h"
 
+#include <cmath>
 #include <mutex>
 #include <vector>
 
@@ -174,6 +175,52 @@ namespace Http::CameraApi
 		else return Fail(400, "action must be play, pause, stop or seek");
 
 		return Ok(json{ { "queued", action }, { "time", state.time } });
+	}
+
+	Response Look(const json& body)
+	{
+		const json& position = Field(body, "position");
+		if (!position.is_object())
+			return Fail(400, "\"position\" must be an object with x, y and z");
+		CameraPose pose;
+		pose.position = Vector3(Number(position, "x"), Number(position, "y"), Number(position, "z"));
+		pose.fov = OptionalNumber(body, "fov", 50.0f);
+
+		if (body.contains("at"))
+		{
+			const json& at = body.at("at");
+			if (!at.is_object())
+				return Fail(400, "\"at\" must be an object with x, y and z");
+			const float dx = Number(at, "x") - pose.position.x;
+			const float dy = Number(at, "y") - pose.position.y;
+			const float dz = Number(at, "z") - pose.position.z;
+			const float flat = std::sqrt(dx * dx + dy * dy);
+			if (flat < 0.001f && std::fabs(dz) < 0.001f)
+				return Fail(400, "\"at\" is the camera position itself");
+			// Game heading: 0 looks along +y, 90 along -x, so yaw = atan2(-dx, dy).
+			pose.rotation = Vector3(
+				static_cast<float>(std::atan2(dz, flat) * 180.0 / MATH_PI), 0.0f,
+				static_cast<float>(std::atan2(-dx, dy) * 180.0 / MATH_PI));
+		}
+		else
+		{
+			const json& rotation = Field(body, "rotation");
+			if (!rotation.is_object())
+				return Fail(400, "give \"at\" or \"rotation\" {pitch, roll, yaw}");
+			pose.rotation = Vector3(Number(rotation, "pitch"), OptionalNumber(rotation, "roll", 0.0f), Number(rotation, "yaw"));
+		}
+
+		std::lock_guard<std::mutex> lock(StateMutex());
+		PlayerState& state = State();
+		state.lookPose = pose;
+		state.requestLook = true;
+		return Ok(json{
+			{ "queued", "look" },
+			{ "position", { { "x", pose.position.x }, { "y", pose.position.y }, { "z", pose.position.z } } },
+			{ "rotation", { { "pitch", pose.rotation.x }, { "roll", pose.rotation.y }, { "yaw", pose.rotation.z } } },
+			{ "fov", pose.fov },
+			{ "note", "held until POST /camera/stop (gives the view back) or play/seek" },
+		});
 	}
 
 	Response ListSaved()

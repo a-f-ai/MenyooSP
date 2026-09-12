@@ -251,9 +251,19 @@ namespace sub::Spooner::CameraPaths
 		{
 			state.requestStop = false;
 			state.transport = Transport::Stopped;
+			state.holdingLook = false;
 			state.time = 0.0f;
 			GiveBackView();
 			state.status = "stopped";
+		}
+
+		if (state.requestLook)
+		{
+			state.requestLook = false;
+			state.holdingLook = true;
+			state.transport = Transport::Stopped;
+			state.status = "looking";
+			ApplyPose(state.lookPose);
 		}
 
 		if (state.requestPause)
@@ -277,6 +287,7 @@ namespace sub::Spooner::CameraPaths
 			{
 				if (state.transport == Transport::Stopped)
 					state.time = 0.0f;
+				state.holdingLook = false;
 				state.transport = Transport::Playing;
 				state.status = "playing";
 			}
@@ -289,6 +300,7 @@ namespace sub::Spooner::CameraPaths
 			{
 				const CameraKey& key = state.path.keys[state.selectedKey];
 				state.time = key.time;
+				state.holdingLook = false;
 				state.transport = Transport::Paused;
 				ApplyPose(CameraPose{ key.position, key.rotation, key.fov });
 			}
@@ -299,6 +311,7 @@ namespace sub::Spooner::CameraPaths
 			state.requestSeek = false;
 			if (!state.path.Empty())
 			{
+				state.holdingLook = false;
 				if (state.transport == Transport::Stopped)
 					state.transport = Transport::Paused;
 				ApplyPose(state.path.Evaluate(state.time));
@@ -326,6 +339,10 @@ namespace sub::Spooner::CameraPaths
 		{
 			// Hold the paused pose, otherwise the game drifts the camera back.
 			ApplyPose(state.path.Evaluate(state.time));
+		}
+		else if (state.holdingLook)
+		{
+			ApplyPose(state.lookPose);
 		}
 
 		state.pathCameraOwnsView = g_cameraOwnsView;

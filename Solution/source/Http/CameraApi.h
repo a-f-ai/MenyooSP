@@ -23,6 +23,9 @@ namespace Http::CameraApi
 	Response AppendKey(const nlohmann::json& body);
 	Response DeleteKey(int index);
 	Response Transport(const std::string& action, float time);
+	// {position:{x,y,z}, rotation:{pitch,roll,yaw}?, at:{x,y,z}?, fov?}: hold the camera
+	// there until the next transport request. `at` derives the rotation.
+	Response Look(const nlohmann::json& body);
 	Response ListSaved();
 	Response SavePath(const std::string& name);
 	Response LoadPath(const std::string& name);

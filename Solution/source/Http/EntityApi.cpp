@@ -25,6 +25,7 @@
 #include <json/single_include/nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -40,6 +41,11 @@ namespace Http::EntityApi
 	{
 		constexpr DWORD kModelLoadTimeoutMs = 4000;
 		constexpr int kDefaultListLimit = 200;
+		// A standing ped's origin sits this far above the surface. Measured on 686
+		// of the author's peds standing on box-shaped props (tools/calibrate_stand_offsets.py):
+		// 0.998 m, p10-p90 within a centimetre. The model box says 1.30, but that is
+		// the capsule bottom, not the feet.
+		constexpr float kPedStandHeight = 1.0f;
 
 		std::string Serialise(const json& payload)
 		{
@@ -145,16 +151,46 @@ namespace Http::EntityApi
 			Vector3 position(request.position.x, request.position.y, request.position.z);
 			const Vector3 rotation(request.rotation.x, request.rotation.y, request.rotation.z);
 
-			if (request.snapToGround && !ResolveGround(position))
+			const auto type = static_cast<EntityType>(request.type);
+
+			if (request.snapToGround)
 			{
-				failure = "no ground found below z=" + std::to_string(request.position.z) +
-					" at (" + std::to_string(request.position.x) + ", " +
-					std::to_string(request.position.y) + "); the area may not be streamed in";
-				return false;
+				if (!ResolveGround(position))
+				{
+					failure = "no ground found below z=" + std::to_string(request.position.z) +
+						" at (" + std::to_string(request.position.x) + ", " +
+						std::to_string(request.position.y) + "); the area may not be streamed in";
+					return false;
+				}
+				// The cast gives the surface; a ped's origin is not on the surface.
+				if (type == EntityType::PED)
+					position.z += kPedStandHeight;
+			}
+
+			if (request.expectedSupportZ.has_value())
+			{
+				// Probe from just above the origin so the cast finds what is under
+				// the entity, whether the caller snapped or gave z themselves.
+				Vector3 probe = position;
+				probe.z += 0.5f;
+				const float found = World::GetGroundHeight(probe);
+				if (found <= -1000.0f || found >= 10000.0f)
+				{
+					failure = "expectedSupportZ=" + std::to_string(*request.expectedSupportZ) +
+						" but no surface was found below the position; the area may not be streamed in";
+					return false;
+				}
+				if (std::fabs(found - *request.expectedSupportZ) > request.tolerance)
+				{
+					failure = "the surface under the position is at z=" + std::to_string(found) +
+						", " + std::to_string(std::fabs(found - *request.expectedSupportZ)) +
+						" m from expectedSupportZ=" + std::to_string(*request.expectedSupportZ) +
+						" (tolerance " + std::to_string(request.tolerance) + "); not spawned";
+					return false;
+				}
 			}
 
 			Model model(static_cast<Hash>(request.model));
-			const auto type = static_cast<EntityType>(request.type);
 
 			switch (type)
 			{
@@ -438,6 +474,53 @@ namespace Http::EntityApi
 
 		sub::Spooner::EntityManagement::DeleteEntity(*entity);
 		return Ok(json{ { "deleted", json::array({ id }) }, { "count", 1 } });
+	}
+
+	Response Settle(const SettleQuery& query)
+	{
+		struct Watched { int id; std::string name; Vector3 before; };
+		std::vector<Watched> watched;
+		for (auto& entity : EntityDb)
+		{
+			if (!entity.handle.Exists() || !MatchesFilter(entity, query.namePrefix, query.type))
+				continue;
+			watched.push_back(Watched{ entity.handle.GetHandle(), entity.hashName, entity.handle.GetPosition() });
+		}
+		if (watched.empty())
+			return Fail(404, "nothing matches name prefix \"" + query.namePrefix + "\"" +
+				(query.type.empty() ? "" : " and type " + query.type));
+
+		for (int frame = 0; frame < query.frames; ++frame)
+			WAIT(0);
+
+		json moved = json::array();
+		int gone = 0;
+		for (const auto& w : watched)
+		{
+			GTAentity handle(w.id);
+			if (!handle.Exists())
+			{
+				++gone;
+				moved.push_back(json{ { "id", w.id }, { "name", w.name }, { "gone", true } });
+				continue;
+			}
+			const Vector3 after = handle.GetPosition();
+			const float distance = (after - w.before).Length();
+			if (distance > query.epsilon)
+			{
+				moved.push_back(json{
+					{ "id", w.id }, { "name", w.name }, { "displacement", distance },
+					{ "dz", after.z - w.before.z },
+					{ "from", { { "x", w.before.x }, { "y", w.before.y }, { "z", w.before.z } } },
+					{ "to", { { "x", after.x }, { "y", after.y }, { "z", after.z } } },
+				});
+			}
+		}
+		return Ok(json{
+			{ "checked", watched.size() }, { "frames", query.frames }, { "epsilon", query.epsilon },
+			{ "still", watched.size() - moved.size() }, { "moved", std::move(moved) }, { "gone", gone },
+			{ "note", "a frozen entity never moves; pass dynamic:true when spawning if this check is to mean anything" },
+		});
 	}
 
 	Response DeleteMatching(const std::string& namePrefix, const std::string& type)

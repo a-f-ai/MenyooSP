@@ -297,7 +297,10 @@ namespace Http::Server
 			create.rotation = body.contains("rotation")
 				? ParseRotation(body.at("rotation"))
 				: EntityApi::Vec3{ 0.0f, 0.0f, 0.0f };
-			create.dynamic = OptionalBool(body, "dynamic", false);
+			// The author's own Menyoo settings: peds and vehicles spawn dynamic, props
+			// frozen. A frozen ped stays wherever it was put - in the air or in the
+			// floor - and hides a wrong height, so it must be asked for explicitly.
+			create.dynamic = OptionalBool(body, "dynamic", create.type != 3);
 			create.snapToGround = OptionalBool(body, "snapToGround", !body.at("position").contains("z"));
 			// Placement is what this API is for, so a ped holds its spot unless
 			// the caller asks for ambient behaviour.
@@ -308,6 +311,12 @@ namespace Http::Server
 
 			if (create.animDict.empty() != create.animName.empty())
 				throw ApiError(400, "\"animDict\" and \"animName\" must be given together");
+
+			if (body.contains("expectedSupportZ"))
+				create.expectedSupportZ = Number(body, "expectedSupportZ");
+			create.tolerance = OptionalNumber(body, "tolerance", 0.25f);
+			if (create.tolerance <= 0.0f)
+				throw ApiError(400, "\"tolerance\" must be positive");
 			return create;
 		}
 
@@ -402,7 +411,10 @@ namespace Http::Server
 							  "placing something whose footprint you do not already know" },
 				{ "entities", json::array({
 					"GET    /entities?name=&type=&limit=&offset=",
-					"POST   /entities            {type, model, position:{x,y,z?}, rotation?, name?, dynamic?, snapToGround?, still?, scenario?, animDict?, animName?}",
+					"POST   /entities            {type, model, position:{x,y,z?}, rotation?, name?, dynamic?, snapToGround?, still?, scenario?, animDict?, animName?, expectedSupportZ?, tolerance?}",
+					"       peds and vehicles spawn dynamic unless dynamic:false; a ped snapped to ground gets its origin 1.0 m above it",
+					"       expectedSupportZ: the surface z you believe is under the entity; the spawn refuses (with the z it found) if the real surface is further than tolerance (0.25)",
+					"POST   /entities/settle     {name?|type?, frames?=90, epsilon?=0.1} waits, then lists what moved - a measurement, nothing is corrected",
 					"POST   /entities/batch      {items:[ <the same object>, ... ]} up to 400, one shared model load, 207 when some fail",
 					"GET    /entities/{id}",
 					"PATCH  /entities/{id}       {position?, rotation?, snapToGround?, scenario?, animDict?, animName?}",
@@ -437,6 +449,7 @@ namespace Http::Server
 					"POST   /camera/keys        a key body, or empty to take one from the live camera",
 					"DELETE /camera/keys/{index}",
 					"POST   /camera/play | /camera/pause | /camera/stop | /camera/seek {time}",
+					"POST   /camera/look        {position:{x,y,z}, at:{x,y,z} | rotation:{pitch,roll,yaw}, fov?} hold the camera there; stop gives the view back",
 					"GET    /camera/paths       saved flythroughs in menyooStuff/CameraPaths",
 					"POST   /camera/paths/save | /camera/paths/load  {name}",
 				}) },
@@ -574,6 +587,33 @@ namespace Http::Server
 					const int id = ParseId(req.matches[1]);
 					return std::function<Response()>([id] { return EntityApi::DeleteEntity(id); });
 				});
+			});
+
+			server.Post("/entities/settle", [](const httplib::Request& request, httplib::Response& response) {
+				std::chrono::milliseconds timeout = 4000ms;
+				EntityApi::SettleQuery query{};
+				try
+				{
+					const json body = ParseObjectBody(request);
+					query.namePrefix = OptionalString(body, "name", "");
+					query.type = OptionalString(body, "type", "");
+					if (query.namePrefix.empty() && query.type.empty())
+						throw ApiError(400, "give \"name\" (a prefix) or \"type\" so the check has a subject");
+					query.frames = OptionalInt(body, "frames", 90);
+					if (query.frames < 1 || query.frames > 600)
+						throw ApiError(400, "\"frames\" must be between 1 and 600");
+					query.epsilon = OptionalNumber(body, "epsilon", 0.1f);
+					// Frames pass at the game's rate; allow for 30 fps plus a margin.
+					timeout = std::chrono::milliseconds(3000 + query.frames * 40);
+				}
+				catch (const ApiError& error)
+				{
+					Write(response, error.Status(), json{ { "error", error.what() } });
+					return;
+				}
+				Handle(request, response, [query](const httplib::Request&) {
+					return std::function<Response()>([query] { return EntityApi::Settle(query); });
+				}, timeout);
 			});
 
 			server.Delete("/entities", [](const httplib::Request& request, httplib::Response& response) {
@@ -757,6 +797,10 @@ namespace Http::Server
 					}
 					return CameraApi::Transport(action, time);
 				});
+			});
+
+			server.Post("/camera/look", [direct](const httplib::Request& request, httplib::Response& response) {
+				direct(response, [&request] { return CameraApi::Look(ParseObjectBody(request)); });
 			});
 
 			server.Get("/camera/paths", [direct](const httplib::Request&, httplib::Response& response) {

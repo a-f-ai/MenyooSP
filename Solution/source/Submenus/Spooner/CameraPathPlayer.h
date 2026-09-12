@@ -57,6 +57,12 @@ namespace sub::Spooner::CameraPaths
 		std::string requestSaveName;
 		bool requestNew = false;
 
+		// A single held pose with no path behind it: "stand here, look there".
+		// Any transport request ends it, so play/seek/stop behave as before.
+		bool requestLook = false;
+		bool holdingLook = false;
+		CameraPose lookPose;
+
 		// Written by the script thread for the window to read.
 		Vector3 liveCameraPosition;
 		Vector3 liveCameraRotation;
