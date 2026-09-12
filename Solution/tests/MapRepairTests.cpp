@@ -3,12 +3,12 @@
 * caused. The interesting property is not that it repairs damage, but that it
 * leaves correct text alone without needing a threshold to decide.
 */
-#include "MapRepair.h"
+#include "NameEncoding.h"
 
 #include <cstdio>
 #include <string>
 
-using namespace sub::Spooner::MapRepair;
+using namespace ige::NameEncoding;
 
 namespace
 {

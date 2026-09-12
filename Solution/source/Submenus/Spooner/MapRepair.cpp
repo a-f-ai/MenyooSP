@@ -3,137 +3,72 @@
 */
 #include "MapRepair.h"
 
+#include "../../macros.h"
+#include "../../Natives/natives2.h"
 #include "../../Util/ExePath.h"
 #include "../../Util/FileLogger.h"
+#include "../../Util/NameEncoding.h"
 
 #include <pugixml/src/pugixml.hpp>
 
-#include <algorithm>
-#include <filesystem>
-#include <string>
 #include <system_error>
 
 namespace sub::Spooner::MapRepair
 {
 	namespace
 	{
-		constexpr int kMaxRounds = 64;
-
-		// One layer off. Every byte must decode from a two-byte UTF-8 sequence
-		// whose code point fits in a byte, because that is exactly what the
-		// latin1 round produced; anything else means this is not inflated text.
-		bool UnwindOnce(const std::string& in, std::string& out)
+		// A file name for display and logging. u8string converts the native
+		// wide path straight to UTF-8 and never consults the ANSI code page, so
+		// unlike string() it cannot throw on a name the page has no room for.
+		std::string DisplayName(const std::filesystem::path& path)
 		{
-			out.clear();
-			out.reserve(in.size() / 2 + 1);
-
-			for (size_t i = 0; i < in.size();)
-			{
-				const unsigned char lead = static_cast<unsigned char>(in[i]);
-				if (lead < 0x80)
-				{
-					out += static_cast<char>(lead);
-					++i;
-					continue;
-				}
-				if ((lead & 0xE0) != 0xC0 || i + 1 >= in.size())
-					return false;
-
-				const unsigned char trail = static_cast<unsigned char>(in[i + 1]);
-				if ((trail & 0xC0) != 0x80)
-					return false;
-
-				const unsigned code = ((lead & 0x1Fu) << 6) | (trail & 0x3Fu);
-				if (code > 0xFF)
-					return false;   // a genuine character, not a doubled byte
-
-				out += static_cast<char>(code);
-				i += 2;
-			}
-			return out != in;
+			const std::u8string utf8 = path.filename().u8string();
+			return std::string(utf8.begin(), utf8.end());
 		}
 
-		// Whether a byte string is well-formed UTF-8. This is what separates
-		// damage from correct text in the Latin-1 range: "Café" and one round
-		// of damage to the byte 0xE9 look identical, but unwinding the real
-		// "Café" lands on a lone 0xE9, which is not valid UTF-8, while
-		// unwinding real damage lands on the text it started as.
-		bool IsValidUtf8(const std::string& text)
+		std::filesystem::path SpoonerDirectory()
 		{
-			for (size_t i = 0; i < text.size();)
-			{
-				const unsigned char lead = static_cast<unsigned char>(text[i]);
-				int extra;
-				if (lead < 0x80)               { ++i; continue; }
-				else if ((lead & 0xE0) == 0xC0) extra = 1;
-				else if ((lead & 0xF0) == 0xE0) extra = 2;
-				else if ((lead & 0xF8) == 0xF0) extra = 3;
-				else return false;
-
-				if (i + extra >= text.size())
-					return false;
-				for (int k = 1; k <= extra; ++k)
-				{
-					if ((static_cast<unsigned char>(text[i + k]) & 0xC0) != 0x80)
-						return false;
-				}
-				i += extra + 1;
-			}
-			return true;
-		}
-
-		std::string Directory()
-		{
-			return GetPathffA(Pathff::Spooner, true);
+			// The narrow form is Menyoo's own and is ASCII, so this conversion
+			// is the one place where it is safe.
+			return std::filesystem::path(GetPathffA(Pathff::Spooner, true));
 		}
 	}
 
 	bool Unwind(const std::string& text, std::string& out, int& rounds)
 	{
-		// Peel layers off, remembering the last one that is still well-formed
-		// UTF-8. Damage always lands back on the text it started as, which is;
-		// correct Latin-1-range text peels into a lone high byte, which is not,
-		// and so is never accepted.
-		std::string current = text;
-		std::string next;
-		std::string best;
-		int bestRounds = 0;
-
-		for (int round = 1; round <= kMaxRounds; ++round)
-		{
-			if (!UnwindOnce(current, next))
-				break;
-			current.swap(next);
-			if (IsValidUtf8(current))
-			{
-				best = current;
-				bestRounds = round;
-			}
-		}
-
-		if (bestRounds == 0)
-			return false;
-		out = best;
-		rounds = bestRounds;
-		return true;
+		return ige::NameEncoding::Unwind(text, out, rounds);
 	}
 
-	FileResult RepairOne(const std::string& name, bool apply)
+	FileResult RepairOne(const std::filesystem::path& path, bool apply)
 	{
 		FileResult result;
-		result.name = name;
+		result.name = DisplayName(path);
 
-		const std::string path = Directory() + name + ".xml";
 		std::error_code sizeError;
-		result.bytesBefore = static_cast<long long>(std::filesystem::file_size(path, sizeError));
-
-		pugi::xml_document doc;
-		if (doc.load_file(path.c_str()).status != pugi::status_ok)
+		const auto before = std::filesystem::file_size(path, sizeError);
+		if (sizeError)
+		{
+			result.failure = "cannot stat: " + sizeError.message();
 			return result;
+		}
+		result.bytesBefore = static_cast<long long>(before);
+
+		// The wide overload: handing pugixml a narrow path would convert
+		// through the code page, which is what killed the first version.
+		pugi::xml_document doc;
+		const pugi::xml_parse_result parsed = doc.load_file(path.c_str());
+		if (parsed.status != pugi::status_ok)
+		{
+			result.failure = std::string("cannot parse: ") + parsed.description();
+			return result;
+		}
 
 		auto root = doc.child("SpoonerPlacements");
 		if (!root)
+		{
+			result.failure = "not a spooner map: no <SpoonerPlacements>";
 			return result;
+		}
 
 		for (auto placement = root.child("Placement"); placement;
 			placement = placement.next_sibling("Placement"))
@@ -158,30 +93,30 @@ namespace sub::Spooner::MapRepair
 		if (!apply || result.namesAffected == 0)
 			return result;
 
-		// Keep the original next to the repaired file rather than in place:
-		// this rewrites names the owner may want to check.
+		std::filesystem::path backup = path;
+		backup += ".bak";
 		std::error_code copyError;
-		std::filesystem::copy_file(path, path + ".bak",
+		std::filesystem::copy_file(path, backup,
 			std::filesystem::copy_options::overwrite_existing, copyError);
 		if (copyError)
 		{
-			addlog(ige::LogType::LOG_ERROR,
-				"MapRepair: could not back up " + path + ": " + copyError.message());
+			// Reported, not swallowed: without a backup nothing is written, and
+			// the caller is told which file was left alone and why.
+			result.failure = "backup failed, left untouched: " + copyError.message();
 			result.namesAffected = 0;
 			return result;
 		}
 
 		if (!doc.save_file(path.c_str()))
 		{
-			addlog(ige::LogType::LOG_ERROR, "MapRepair: could not write " + path);
+			result.failure = "could not write the repaired file";
 			result.namesAffected = 0;
 			return result;
 		}
 
-		result.bytesAfter = static_cast<long long>(std::filesystem::file_size(path, sizeError));
-		addlog(ige::LogType::LOG_INFO, "MapRepair: " + name + " - " +
-			std::to_string(result.namesAffected) + " name(s), " +
-			std::to_string(result.bytesBefore - result.bytesAfter) + " bytes recovered");
+		std::error_code afterError;
+		const auto after = std::filesystem::file_size(path, afterError);
+		result.bytesAfter = afterError ? result.bytesBefore : static_cast<long long>(after);
 		return result;
 	}
 
@@ -190,39 +125,92 @@ namespace sub::Spooner::MapRepair
 		Report report;
 		report.applied = apply;
 
+		const std::filesystem::path directory = SpoonerDirectory();
 		std::error_code walkError;
-		for (const auto& entry : std::filesystem::directory_iterator(Directory(), walkError))
+		std::filesystem::directory_iterator entry(directory, walkError);
+		if (walkError)
+		{
+			FileResult failure;
+			failure.name = DisplayName(directory);
+			failure.failure = "cannot open the Spooner folder: " + walkError.message();
+			report.failed.push_back(std::move(failure));
+			return report;
+		}
+
+		const std::filesystem::directory_iterator end;
+		for (; entry != end; entry.increment(walkError))
 		{
 			if (walkError)
+			{
+				FileResult failure;
+				failure.name = "<directory>";
+				failure.failure = "walk stopped: " + walkError.message();
+				report.failed.push_back(std::move(failure));
 				break;
-			if (!entry.is_regular_file() || entry.path().extension() != ".xml")
+			}
+
+			const std::filesystem::path path = entry->path();
+			if (path.extension() != ".xml")
 				continue;
 
-			++report.filesScanned;
-			FileResult file = RepairOne(entry.path().stem().string(), apply);
-			if (file.namesAffected == 0)
+			std::error_code kindError;
+			if (!std::filesystem::is_regular_file(path, kindError) || kindError)
 				continue;
 
-			report.namesAffected += file.namesAffected;
-			if (apply)
-				report.bytesSaved += file.bytesBefore - file.bytesAfter;
-			report.affected.push_back(std::move(file));
+			++report.filesSeen;
+
+			FileResult file = RepairOne(path, apply);
+			if (!file.failure.empty())
+			{
+				addlog(ige::LogType::LOG_WARNING,
+					"MapRepair: " + file.name + " - " + file.failure);
+				report.failed.push_back(std::move(file));
+			}
+			else if (file.namesAffected > 0)
+			{
+				report.namesAffected += file.namesAffected;
+				if (apply)
+				{
+					report.bytesSaved += file.bytesBefore - file.bytesAfter;
+					addlog(ige::LogType::LOG_INFO, "MapRepair: " + file.name + " - " +
+						std::to_string(file.namesAffected) + " name(s), " +
+						std::to_string(file.bytesBefore - file.bytesAfter) + " bytes recovered");
+				}
+				report.affected.push_back(std::move(file));
+			}
+
+			// One file per frame. Hundreds of maps otherwise stall the game for
+			// as long as the whole folder takes to parse.
+			WAIT(0);
 		}
+
 		return report;
 	}
 
 	std::string Report::Summary() const
 	{
-		if (namesAffected == 0)
-			return "Checked " + std::to_string(filesScanned) + " map(s): all names are clean.";
+		std::string text;
 
-		std::string text = (applied ? "Repaired " : "Found ") +
-			std::to_string(namesAffected) + " inflated name(s) in " +
-			std::to_string(affected.size()) + " of " + std::to_string(filesScanned) + " map(s)";
-		if (applied && bytesSaved > 0)
-			text += ", " + std::to_string(bytesSaved / 1024) + " KB recovered";
-		if (!affected.empty() && !affected.front().sample.empty())
-			text += ". First: \"" + affected.front().sample + "\"";
+		if (namesAffected == 0)
+			text = "Checked " + std::to_string(filesSeen) + " map(s): all names are clean";
+		else
+		{
+			text = (applied ? "Repaired " : "Found ") + std::to_string(namesAffected) +
+				" inflated name(s) in " + std::to_string(affected.size()) +
+				" of " + std::to_string(filesSeen) + " map(s)";
+			if (applied && bytesSaved > 0)
+				text += ", " + std::to_string(bytesSaved / 1024) + " KB recovered";
+			if (!affected.empty() && !affected.front().sample.empty())
+				text += ", e.g. \"" + affected.front().sample + "\"";
+		}
+
+		if (!failed.empty())
+		{
+			text += ". ~r~" + std::to_string(failed.size()) + " file(s) failed: " +
+				failed.front().name + " - " + failed.front().failure;
+			if (failed.size() > 1)
+				text += " (see menyoolog.txt for the rest)";
+		}
 		return text;
 	}
 }

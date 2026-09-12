@@ -144,14 +144,23 @@ namespace Http::MapApi
 			files.push_back(std::move(entry));
 		}
 
-		return Ok(json{
+		// Failures are part of the answer, not a footnote: a map that could not
+		// be read or written is one this did not fix, and the caller has to
+		// know which.
+		json failures = json::array();
+		for (const auto& file : report.failed)
+			failures.push_back(json{ { "map", file.name }, { "error", file.failure } });
+
+		const int status = report.failed.empty() ? 200 : 207;
+		return Response{ status, Serialise(json{
 			{ "applied", apply },
-			{ "filesScanned", report.filesScanned },
+			{ "filesSeen", report.filesSeen },
 			{ "namesAffected", report.namesAffected },
 			{ "bytesSaved", report.bytesSaved },
 			{ "files", std::move(files) },
+			{ "failures", std::move(failures) },
 			{ "summary", report.Summary() },
-		});
+		}) };
 	}
 
 	Response ClearSpawned()

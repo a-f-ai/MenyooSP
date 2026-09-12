@@ -23,18 +23,8 @@ cp "$source_root/Submenus/Spooner/CameraPath.h" \
 cp "$here/CameraPathTests.cpp" "$build/Submenus/Spooner/"
 cp "$source_root/Util/GTAmath.h" "$source_root/Util/GTAmath.cpp" "$build/Util/"
 
-cp "$source_root/Submenus/Spooner/MapRepair.h" \
-   "$source_root/Submenus/Spooner/MapRepair.cpp" "$build/Submenus/Spooner/"
-cp "$here/MapRepairTests.cpp" "$build/Submenus/Spooner/"
-
-# MapRepair reaches the game's path helper for the Spooner directory; the tests
-# only exercise the decoding, so a stub is enough to link.
-cat > "$build/Util/ExePath.h" <<'STUB'
-#pragma once
-#include <string>
-enum class Pathff { Main, Spooner, Audio, Vehicle, Outfit };
-inline std::string GetPathffA(Pathff, bool) { return "./"; }
-STUB
+cp "$source_root/Util/NameEncoding.h" "$source_root/Util/NameEncoding.cpp" "$build/Util/"
+cp "$here/MapRepairTests.cpp" "$build/Util/"
 
 cat > "$build/Util/FileLogger.h" <<'STUB'
 #pragma once
@@ -65,10 +55,8 @@ echo "--- command queue ---"
 echo
 echo "--- map name repair ---"
 "$compiler" "${flags[@]}" \
-    -I"$build/Submenus/Spooner" -I"$build" -I"$pugi_include" \
-    "$build/Submenus/Spooner/MapRepair.cpp" \
-    "$build/Submenus/Spooner/MapRepairTests.cpp" \
-    "$pugi_source" \
+    -I"$build/Util" \
+    "$build/Util/NameEncoding.cpp" "$build/Util/MapRepairTests.cpp" \
     -o "$build/maprepair_tests"
 "$build/maprepair_tests"
 
