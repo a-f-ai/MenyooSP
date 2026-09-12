@@ -461,7 +461,9 @@ namespace sub::Spooner::CharacterPicker
 				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(rgb.x * 1.15f, rgb.y * 1.15f, rgb.z * 1.15f, 1.0f));
 				ImGui::PushStyleColor(ImGuiCol_Text, luminance > 0.6f ? ImVec4(0, 0, 0, 1) : ImVec4(1, 1, 1, 1));
 				ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, selected ? 3.0f : 0.0f);
-				const float width = std::max(72.0f, ImGui::CalcTextSize(caption.c_str()).x + 18.0f);
+				// Not std::max: Windows.h is in this unit without NOMINMAX, so max is a macro.
+				const float textWidth = ImGui::CalcTextSize(caption.c_str()).x + 18.0f;
+				const float width = textWidth > 72.0f ? textWidth : 72.0f;
 				if (used > 0.0f && used + width > avail) { used = 0.0f; }
 				else if (used > 0.0f) ImGui::SameLine();
 				char id[160];
