@@ -99,6 +99,8 @@ namespace Http::EntityApi
 				{ "position", { { "x", position.x }, { "y", position.y }, { "z", position.z } } },
 				{ "rotation", { { "pitch", rotation.x }, { "roll", rotation.y }, { "yaw", rotation.z } } },
 			};
+			if (entity.type == EntityType::PROP)
+				described["textureVariation"] = static_cast<int>(entity.textureVariation);
 
 			ModelApi::AddGeometry(described, entity.handle.GetHandle(), entity.handle.Model().hash);
 			return described;
@@ -223,6 +225,13 @@ namespace Http::EntityApi
 			out.handle.FreezePosition(!request.dynamic);
 			out.handle.SetMissionEntity(true);
 			out.handle.SetLODDistance(1000000);
+
+			if (type == EntityType::PROP && request.textureVariation >= 0)
+			{
+				SET_OBJECT_TINT_INDEX(out.handle.Handle(), request.textureVariation);
+				// Kept on the spooner entity, so a map save writes it back out.
+				out.textureVariation = static_cast<UINT8>(request.textureVariation);
+			}
 
 			if (type == EntityType::PED)
 			{

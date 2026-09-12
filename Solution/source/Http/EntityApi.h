@@ -45,6 +45,10 @@ namespace Http::EntityApi
 		// platform" and "fell through to the deck below", which is otherwise invisible.
 		std::optional<float> expectedSupportZ;
 		float tolerance;
+		// Props only: SET_OBJECT_TINT_INDEX. The stunt blocks and tubes the author
+		// builds from take their colour from this (0..16 on bkr_prop_biker_bblock_*);
+		// 98% of them in the saved maps carry a non-zero value. -1 leaves the default.
+		int textureVariation;
 	};
 
 	struct SettleQuery

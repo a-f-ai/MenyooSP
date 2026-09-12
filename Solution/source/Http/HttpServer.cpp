@@ -317,6 +317,11 @@ namespace Http::Server
 			create.tolerance = OptionalNumber(body, "tolerance", 0.25f);
 			if (create.tolerance <= 0.0f)
 				throw ApiError(400, "\"tolerance\" must be positive");
+			create.textureVariation = OptionalInt(body, "textureVariation", -1);
+			if (create.textureVariation < -1 || create.textureVariation > 63)
+				throw ApiError(400, "\"textureVariation\" must be between 0 and 63, or omitted");
+			if (create.textureVariation >= 0 && create.type != 3)
+				throw ApiError(400, "\"textureVariation\" applies to props only");
 			return create;
 		}
 
@@ -413,6 +418,7 @@ namespace Http::Server
 					"GET    /entities?name=&type=&limit=&offset=",
 					"POST   /entities            {type, model, position:{x,y,z?}, rotation?, name?, dynamic?, snapToGround?, still?, scenario?, animDict?, animName?, expectedSupportZ?, tolerance?}",
 					"       peds and vehicles spawn dynamic unless dynamic:false; a ped snapped to ground gets its origin 1.0 m above it",
+					"       textureVariation (props): the tint index that colours stunt blocks and tubes - the author's maps use 0..16 on bkr_prop_biker_bblock_*; entity listings report it",
 					"       expectedSupportZ: the surface z you believe is under the entity; the spawn refuses (with the z it found) if the real surface is further than tolerance (0.25)",
 					"POST   /entities/settle     {name?|type?, frames?=90, epsilon?=0.1} waits, then lists what moved - a measurement, nothing is corrected",
 					"POST   /entities/batch      {items:[ <the same object>, ... ]} up to 400, one shared model load, 207 when some fail",

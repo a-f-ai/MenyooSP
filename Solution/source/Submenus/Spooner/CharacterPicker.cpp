@@ -232,6 +232,9 @@ namespace sub::Spooner::CharacterPicker
 			bool armsWaving;
 			int texture;
 			bool cycleTextures;
+			int tint;
+			bool cycleTints;
+			int tintCount;
 			// where: either a row across the aim, or the line A->B
 			bool alongLine;
 			Vector3 lineA, lineB;
@@ -299,7 +302,7 @@ namespace sub::Spooner::CharacterPicker
 			return true;
 		}
 
-		bool SpawnPropAt(const PlaceJob& job, Vector3 spot, float yaw, std::vector<int>& placed, std::vector<std::string>& problems)
+		bool SpawnPropAt(const PlaceJob& job, int index, Vector3 spot, float yaw, std::vector<int>& placed, std::vector<std::string>& problems)
 		{
 			GTAmodel::Model model(static_cast<Hash>(job.propHash));
 			if (!model.IsInCdImage())
@@ -329,6 +332,7 @@ namespace sub::Spooner::CharacterPicker
 			request.snapToGround = false;
 			request.still = false;
 			request.tolerance = 0.25f;
+			request.textureVariation = job.cycleTints ? (job.tint + index) % (job.tintCount > 0 ? job.tintCount : 1) : job.tint;
 			int id = 0;
 			std::string failure;
 			if (!Http::EntityApi::CreateDirect(request, id, failure))
@@ -431,7 +435,7 @@ namespace sub::Spooner::CharacterPicker
 
 				if (job.mode == Mode::Props)
 				{
-					SpawnPropAt(job, spot, yaw, placed, problems);
+					SpawnPropAt(job, i, spot, yaw, placed, problems);
 					continue;
 				}
 				const Variant& variant = rainbowOn
@@ -470,6 +474,8 @@ namespace sub::Spooner::CharacterPicker
 				}
 			}
 			if (job.cycleTextures) g_state.texture = (job.texture + static_cast<int>(spots.size())) % 16;
+			if (job.mode == Mode::Props && job.cycleTints && job.tintCount > 0)
+				g_state.tint = (job.tint + static_cast<int>(spots.size())) % job.tintCount;
 		}
 
 		void RunUndo(std::vector<int> ids)
@@ -528,6 +534,9 @@ namespace sub::Spooner::CharacterPicker
 			job.armsWaving = state.armsWaving;
 			job.texture = std::clamp(state.texture, 0, 15);
 			job.cycleTextures = state.cycleTextures;
+			job.tint = std::clamp(state.tint, 0, 63);
+			job.cycleTints = state.cycleTints;
+			job.tintCount = std::clamp(state.tintCount, 1, 64);
 			if (state.mode == Mode::Peds)
 			{
 				if (state.selectedCharacter < 0 || state.selectedCharacter >= static_cast<int>(state.characters.size()))
@@ -796,6 +805,12 @@ namespace sub::Spooner::CharacterPicker
 			else if (state.selectedProp >= 0 && state.selectedProp < static_cast<int>(state.props.size()))
 				ImGui::TextDisabled("from the list: %s", state.props[state.selectedProp].model.c_str());
 			ImGui::TextWrapped("The list is the author's own vocabulary: the 150 props the saved maps use most. Props are frozen and put down on their bottom face.");
+			ImGui::Separator();
+			ImGui::SetNextItemWidth(120.0f); ImGui::SliderInt("tint", &state.tint, 0, 31);
+			ImGui::SameLine(); ImGui::Checkbox("cycle tints", &state.cycleTints);
+			ImGui::SameLine(); ImGui::SetNextItemWidth(90.0f); ImGui::SliderInt("of", &state.tintCount, 2, 32);
+			if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+				ImGui::SetTooltip("TextureVariation: the colour of stunt blocks and tubes.\nbkr_prop_biker_bblock_* and the stunt tubes use 0..16 in the author's maps.\nWith cycle on, a row walks through the tints and the next click carries on.");
 		}
 
 		ImGui::Separator();

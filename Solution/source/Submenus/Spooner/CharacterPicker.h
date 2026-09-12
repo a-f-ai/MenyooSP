@@ -69,6 +69,9 @@ namespace sub::Spooner::CharacterPicker
 		bool armsWaving = true;   // the author's peds wave their arms
 		int texture = 0;          // ped component texture, for models that carry recolours
 		bool cycleTextures = false;
+		int tint = 0;             // prop TextureVariation: the colour of stunt blocks and tubes
+		bool cycleTints = false;  // next tint for each prop along a row, and the next click carries on
+		int tintCount = 16;       // how many tints the model has; bblock/tube families use 0..16
 
 		// The cursor the person sees is ImGui's; the world ray is built from it,
 		// not from the game's own cursor, which drifts from it under CrossOver.
