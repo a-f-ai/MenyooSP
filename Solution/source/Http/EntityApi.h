@@ -73,6 +73,10 @@ namespace Http::EntityApi
 		int offset;
 	};
 
+	// For callers already on the script thread (the character picker): the same
+	// spawn as POST /entities, without the JSON round trip.
+	bool CreateDirect(const CreateRequest& request, int& idOut, std::string& failure);
+
 	Response ListEntities(const ListQuery& query);
 	Response GetEntity(int id);
 	Response CreateEntity(const CreateRequest& request);

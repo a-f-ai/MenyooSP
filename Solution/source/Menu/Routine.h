@@ -64,6 +64,7 @@ extern INT16 BindCameraPathAddKey;
 extern INT16 BindCameraPathPlay;
 extern INT16 BindCameraPathStop;
 extern INT16 BindBecomePed;
+extern INT16 BindCharacterPicker;
 extern RgbS g_fadedRGB, g_neonFade, g_neonSlide, g_neonHeart, g_neonShift;
 extern bool g_neonFlash;
 extern int g_neonSpin, g_neonSpinBack;

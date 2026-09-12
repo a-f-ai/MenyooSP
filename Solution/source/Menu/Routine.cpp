@@ -16,6 +16,7 @@
 #include "../Submenus/Spooner/ImGuiSpooner.h"
 #include "..\Http\HttpServer.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Submenus\Spooner\CharacterPicker.h"
 #include "..\Submenus\Spooner\SpoonerEntity.h"
 #include "..\Submenus\Spooner\SpoonerMode.h"
 #include "..\Submenus\Spooner\ImGuiSpooner.h"
@@ -245,6 +246,13 @@ inline void MenyooMain()
 			BecomeSelectedOrAimedPed();
 		if (IsKeyJustUp(BindCameraPath))
 			sub::Spooner::CameraPaths::ToggleWindow();
+		if (IsKeyJustUp(BindCharacterPicker))
+			sub::Spooner::CharacterPicker::ToggleWindow();
+		// The cursor key serves whichever window is up; the camera window wins
+		// when both are, so its own handling below stays as it was.
+		if (sub::Spooner::CharacterPicker::IsWindowVisible() && !sub::Spooner::CameraPaths::IsWindowVisible() &&
+			IsKeyJustUp(BindCameraPathCursor))
+			sub::Spooner::CharacterPicker::ToggleCursorMode();
 		if (sub::Spooner::CameraPaths::IsWindowVisible())
 		{
 			// Hotkeys so a whole flythrough can be built with the camera in
@@ -278,6 +286,7 @@ inline void MenyooMain()
 				sub::Spooner::CameraPaths::State().requestStop = true;
 			}
 		}
+		sub::Spooner::CharacterPicker::Tick();
 		sub::Spooner::CameraPaths::Tick();
 		Http::Server::DrainCommands();
 		WAIT(0);
@@ -614,6 +623,7 @@ INT16 BindCameraPathAddKey = VirtualKey::OEM6;   // ]
 INT16 BindCameraPathPlay = VirtualKey::OEM4;     // [
 INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
 INT16 BindBecomePed = VirtualKey::F6;
+INT16 BindCharacterPicker = VirtualKey::F5;
 
 INT16 bind_no_clip = VirtualKey::F3;
 

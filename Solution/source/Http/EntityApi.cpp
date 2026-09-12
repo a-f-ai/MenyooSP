@@ -305,6 +305,15 @@ namespace Http::EntityApi
 		}
 	}
 
+	bool CreateDirect(const CreateRequest& request, int& idOut, std::string& failure)
+	{
+		SpoonerEntity created;
+		if (!Spawn(request, created, failure))
+			return false;
+		idOut = created.handle.GetHandle();
+		return true;
+	}
+
 	Response ListEntities(const ListQuery& query)
 	{
 		const int limit = query.limit > 0 ? query.limit : kDefaultListLimit;

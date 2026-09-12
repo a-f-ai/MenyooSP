@@ -21,6 +21,7 @@
 #include "..\..\Natives\natives.h"
 #include "Submenus.h"
 #include "CameraPathUI.h"
+#include "CharacterPicker.h"
 #include "CameraPathPlayer.h"
 
 namespace sub::Spooner::ImGuiSpooner
@@ -350,7 +351,7 @@ namespace sub::Spooner::ImGuiSpooner
 
 	static void OnRender(ID3D11Device* device, ID3D11DeviceContext* context, IDXGISwapChain* swapChain)
 	{
-		if (g_ShuttingDown || (!g_Visible && !CameraPaths::IsWindowVisible()))
+		if (g_ShuttingDown || (!g_Visible && !CameraPaths::IsWindowVisible() && !CharacterPicker::IsWindowVisible()))
 		{
 			D3D11Hook::SetMenuVisible(false);
 			return;
@@ -391,13 +392,14 @@ namespace sub::Spooner::ImGuiSpooner
 
 			ImGui::GetIO().MouseDrawCursor =
 				(g_Shared.editingState.mode == SpoonerMode::eEditMode::Gizmo && g_Shared.editingState.cameraLocked) ||
-				CameraPaths::IsCursorMode();
+				CameraPaths::IsCursorMode() || CharacterPicker::IsCursorMode();
 
 			if (g_Visible)
 				RunGizmo_NoLock(g_Shared);
 		}
 
 		CameraPathUI::Draw();
+		CharacterPicker::Draw();
 
 		// Published for the script thread, which polls the hotkeys.
 		g_WantsTextInput.store(ImGui::GetIO().WantTextInput, std::memory_order_relaxed);
@@ -553,7 +555,7 @@ namespace sub::Spooner::ImGuiSpooner
 		// Only while the window owns the mouse. Suppressing input just because
 		// the window is open takes away camera control, which is exactly what
 		// you need in order to place a key.
-		if (CameraPaths::IsCursorMode())
+		if (CameraPaths::IsCursorMode() || CharacterPicker::IsCursorMode())
 			suppressGameInput = true;
 
 		if (suppressGameInput)
@@ -593,7 +595,7 @@ namespace sub::Spooner::ImGuiSpooner
 
 	void NotifyOverlayChanged()
 	{
-		D3D11Hook::SetMenuVisible(g_Visible || CameraPaths::IsWindowVisible());
+		D3D11Hook::SetMenuVisible(g_Visible || CameraPaths::IsWindowVisible() || CharacterPicker::IsWindowVisible());
 	}
 
 	bool WantsTextInput()

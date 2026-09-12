@@ -110,6 +110,7 @@ void MenuConfig::ConfigRead()
 	BindCameraPathPlay = ini.GetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
 	BindCameraPathStop = ini.GetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
 	BindBecomePed = ini.GetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
+	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 
 
 	std::string section_colours = "colours";/////////
@@ -381,6 +382,7 @@ void MenuConfig::SaveConfig()
 	ini.SetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
 	ini.SetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
 	ini.SetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
+	ini.SetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 
 
 	std::string section_colours = "colours";/////////
