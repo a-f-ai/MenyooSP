@@ -271,6 +271,15 @@ namespace sub::Spooner::CharacterPicker
 				g_state.lastPlaced = placed;
 				g_state.placedTotal += static_cast<int>(placed.size());
 			}
+			// Round robin across clicks as well as along a row: the next placement
+			// starts where this one's colours left off, so click, click, click gives
+			// a different colour each time without touching the keyboard.
+			if (job.rainbow && g_state.selectedCharacter >= 0 &&
+				g_state.selectedCharacter < static_cast<int>(g_state.characters.size()) &&
+				g_state.characters[g_state.selectedCharacter].variants.size() == job.character.variants.size())
+			{
+				g_state.selectedVariant = (job.variantIndex + job.count) % static_cast<int>(job.character.variants.size());
+			}
 			g_state.status = "placed " + std::to_string(placed.size()) + " x " + job.character.label;
 			if (!problems.empty())
 			{
@@ -486,7 +495,7 @@ namespace sub::Spooner::CharacterPicker
 			ImGui::RadioButton("face away", &facing, 1); ImGui::SameLine();
 			ImGui::RadioButton("as camera", &facing, 2);
 			state.facing = static_cast<Facing>(facing);
-			ImGui::Checkbox("rainbow: cycle colours along the row", &state.rainbow);
+			ImGui::Checkbox("rainbow: next colour for each ped, and the next click carries on", &state.rainbow);
 			ImGui::Checkbox("arms waving (the author's look)", &state.armsWaving);
 		}
 		else
