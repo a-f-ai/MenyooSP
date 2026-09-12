@@ -3,6 +3,8 @@
 */
 #include "WorldApi.h"
 
+#include "ModelApi.h"
+
 #include "../macros.h"
 #include "../Natives/natives2.h"
 #include "../Scripting/Camera.h"
@@ -164,12 +166,14 @@ namespace Http::WorldApi
 			for (auto& ped : peds)
 			{
 				if (static_cast<int>(found.size()) >= cap) break;
-				found.push_back(json{
+				json item{
 					{ "id", ped.GetHandle() }, { "type", "ped" },
 					{ "model", IntToHexString(ped.Model().hash, true) },
 					{ "name", GetPedModelLabel(ped.Model(), true) },
 					{ "position", Point(ped.GetPosition()) },
-				});
+				};
+				ModelApi::AddGeometry(item, ped.GetHandle(), ped.Model().hash);
+				found.push_back(std::move(item));
 			}
 		}
 		if (wantVehicles)
@@ -179,12 +183,14 @@ namespace Http::WorldApi
 			for (auto& vehicle : vehicles)
 			{
 				if (static_cast<int>(found.size()) >= cap) break;
-				found.push_back(json{
+				json item{
 					{ "id", vehicle.GetHandle() }, { "type", "vehicle" },
 					{ "model", IntToHexString(vehicle.Model().hash, true) },
 					{ "name", get_vehicle_model_label(vehicle.Model(), true) },
 					{ "position", Point(vehicle.GetPosition()) },
-				});
+				};
+				ModelApi::AddGeometry(item, vehicle.GetHandle(), vehicle.Model().hash);
+				found.push_back(std::move(item));
 			}
 		}
 		if (wantProps)
@@ -194,19 +200,21 @@ namespace Http::WorldApi
 			for (auto& prop : props)
 			{
 				if (static_cast<int>(found.size()) >= cap) break;
-				found.push_back(json{
+				json item{
 					{ "id", prop.GetHandle() }, { "type", "prop" },
 					{ "model", IntToHexString(prop.Model().hash, true) },
 					{ "name", get_prop_model_label(prop.Model()) },
 					{ "position", Point(prop.GetPosition()) },
-				});
+				};
+				ModelApi::AddGeometry(item, prop.GetHandle(), prop.Model().hash);
+				found.push_back(std::move(item));
 			}
 		}
 
 		return Ok(json{
 			{ "origin", Point(origin) }, { "radius", radius },
 			{ "count", found.size() }, { "entities", std::move(found) },
-			{ "note", "these are world entities, not only the ones the spooner owns" },
+			{ "note", "these are world entities, not only the ones the spooner owns. \"size\" is the model box in metres, \"bounds\" the world box it occupies after rotation" },
 		});
 	}
 }

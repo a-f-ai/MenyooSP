@@ -16,6 +16,7 @@
 #include "EntityApi.h"
 #include "Json.h"
 #include "MapApi.h"
+#include "ModelApi.h"
 #include "WorldApi.h"
 
 #include "../Natives/natives2.h"
@@ -104,6 +105,26 @@ namespace Http::Server
 		// Bodies
 		// ---------------------------------------------------------------
 
+		unsigned long ResolveModel(const std::string& raw, const char* what)
+		{
+			if (raw.empty())
+				throw ApiError(400, std::string(what) + " must not be empty");
+
+			if (raw.size() > 2 && raw[0] == '0' && (raw[1] == 'x' || raw[1] == 'X'))
+			{
+				try
+				{
+					return std::stoul(raw, nullptr, 16);
+				}
+				catch (const std::exception&)
+				{
+					throw ApiError(400, std::string(what) + " looks like hex but will not parse: " + raw);
+				}
+			}
+			// Menyoo's own joaat, not a game native, so calling it here is safe.
+			return GET_HASH_KEY(raw.c_str());
+		}
+
 		unsigned long ParseModel(const json& body, std::string& label)
 		{
 			const json& value = Field(body, "model");
@@ -116,24 +137,45 @@ namespace Http::Server
 			if (!value.is_string())
 				throw ApiError(400, "field \"model\" must be a model name or a hash");
 
-			const std::string raw = value.get<std::string>();
-			if (raw.empty())
-				throw ApiError(400, "field \"model\" must not be empty");
-			label = raw;
+			label = value.get<std::string>();
+			return ResolveModel(label, "field \"model\"");
+		}
 
-			if (raw.size() > 2 && raw[0] == '0' && (raw[1] == 'x' || raw[1] == 'X'))
+		std::vector<ModelApi::ModelRef> ParseModelList(const httplib::Request& request)
+		{
+			const std::string raw = Param(request, "models");
+			if (raw.empty())
+				throw ApiError(400, "missing required query parameter \"models\": a comma-separated "
+					"list of model names or 0x hashes");
+
+			std::vector<ModelApi::ModelRef> models;
+			size_t start = 0;
+			while (start <= raw.size())
 			{
-				try
+				const size_t comma = raw.find(',', start);
+				const size_t end = comma == std::string::npos ? raw.size() : comma;
+
+				std::string name = raw.substr(start, end - start);
+				const size_t first = name.find_first_not_of(" \t");
+				const size_t last = name.find_last_not_of(" \t");
+				if (first != std::string::npos)
 				{
-					return std::stoul(raw, nullptr, 16);
+					name = name.substr(first, last - first + 1);
+					models.push_back(ModelApi::ModelRef{ ResolveModel(name, "\"models\""), name });
 				}
-				catch (const std::exception&)
-				{
-					throw ApiError(400, "field \"model\" looks like hex but will not parse: " + raw);
-				}
+
+				if (comma == std::string::npos)
+					break;
+				start = comma + 1;
 			}
-			// Menyoo's own joaat, not a game native, so calling it here is safe.
-			return GET_HASH_KEY(raw.c_str());
+
+			if (models.empty())
+				throw ApiError(400, "query parameter \"models\" held no model names");
+			if (models.size() > ModelApi::kMaxModelsPerQuery)
+				throw ApiError(400, "at most " + std::to_string(ModelApi::kMaxModelsPerQuery) +
+					" models per request, got " + std::to_string(models.size()) +
+					"; every one of them has to be streamed in to be measured");
+			return models;
 		}
 
 		int ParseType(const json& body)
@@ -291,6 +333,9 @@ namespace Http::Server
 				{ "placement", "omit position.z, or pass snapToGround, and the plugin casts down from "
 							   "position.z (default 1000) and puts the entity on the first surface below. "
 							   "Never guess a height" },
+				{ "geometry", "entity listings carry \"size\", the model's box in metres, and \"bounds\", "
+							  "the world box it occupies once rotated. Ask /models/dimensions before "
+							  "placing something whose footprint you do not already know" },
 				{ "entities", json::array({
 					"GET    /entities?name=&type=&limit=&offset=",
 					"POST   /entities            {type, model, position:{x,y,z?}, rotation?, name?, dynamic?, snapToGround?, still?, scenario?, animDict?, animName?}",
@@ -313,6 +358,12 @@ namespace Http::Server
 					"GET /catalog/props?q=",
 					"GET /catalog/scenarios?q=",
 					"GET /catalog/animations?q=&filter=<dict>",
+				}) },
+				{ "models", json::array({
+					"GET /models/dimensions?models=a,b,c   up to 64 names or 0x hashes at a time",
+					"    min/max/size in model space, and restZOffset, the z to add to a ground "
+					"height so the model rests on it instead of sinking into it",
+					"    the query streams every model in to measure it, so ask once and cache",
 				}) },
 				{ "camera", json::array({
 					"GET    /camera/path        the current flythrough and where it is playing",
@@ -532,6 +583,15 @@ namespace Http::Server
 			server.Get("/catalog/props", catalogRoute(&CatalogApi::Props));
 			server.Get("/catalog/scenarios", catalogRoute(&CatalogApi::Scenarios));
 			server.Get("/catalog/animations", catalogRoute(&CatalogApi::Animations));
+
+			// ---- models ----
+
+			server.Get("/models/dimensions", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const std::vector<ModelApi::ModelRef> models = ParseModelList(req);
+					return std::function<Response()>([models] { return ModelApi::GetDimensions(models); });
+				}, 10000ms);
+			});
 
 			// ---- maps ----
 

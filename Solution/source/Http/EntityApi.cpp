@@ -3,6 +3,8 @@
 */
 #include "EntityApi.h"
 
+#include "ModelApi.h"
+
 #include "../macros.h"
 #include "../Natives/natives2.h"
 #include "../Scripting/GTAentity.h"
@@ -78,7 +80,7 @@ namespace Http::EntityApi
 			const Vector3& position = entity.handle.GetPosition();
 			const Vector3& rotation = entity.handle.GetRotation();
 
-			return json{
+			json described{
 				{ "id", entity.handle.GetHandle() },
 				{ "type", TypeName(entity.type) },
 				{ "model", IntToHexString(entity.handle.Model().hash, true) },
@@ -90,6 +92,9 @@ namespace Http::EntityApi
 				{ "position", { { "x", position.x }, { "y", position.y }, { "z", position.z } } },
 				{ "rotation", { { "pitch", rotation.x }, { "roll", rotation.y }, { "yaw", rotation.z } } },
 			};
+
+			ModelApi::AddGeometry(described, entity.handle.GetHandle(), entity.handle.Model().hash);
+			return described;
 		}
 
 		// Casts down from the requested point. Passing a z above the surface is
