@@ -179,6 +179,7 @@ namespace Http::CameraApi
 
 	Response Look(const json& body)
 	{
+		using namespace Http::Json; // HTTP thread: Field/Number may throw ApiError here
 		const json& position = Field(body, "position");
 		if (!position.is_object())
 			return Fail(400, "\"position\" must be an object with x, y and z");
