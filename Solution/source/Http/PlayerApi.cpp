@@ -19,6 +19,9 @@ namespace Http::PlayerApi
 {
 	namespace
 	{
+		std::vector<ControlRequest> g_heldControls;
+		int g_controlReleaseTime = 0;
+
 		Response Serialise(int status, const json& payload)
 		{
 			return Response{ status, payload.dump(2, ' ', false, json::error_handler_t::replace) };
@@ -71,16 +74,46 @@ namespace Http::PlayerApi
 		});
 	}
 
-	Response ApplyControls(const std::vector<ControlRequest>& controls)
+	Response ApplyControls(const std::vector<ControlRequest>& controls, int holdMilliseconds)
 	{
 		for (const ControlRequest& control : controls)
 		{
 			if (!PlayerInput::IsControlIdValid(control.control) || !PlayerInput::IsValueValid(control.value))
 				return Fail(400, "controls contain an invalid control id or value");
-			if (!PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, control.control, control.value))
-				return Fail(422, "GTA refused a virtual control value");
+		}
+		if (!PlayerInput::IsHoldMillisecondsValid(holdMilliseconds))
+			return Fail(400, "holdMilliseconds must be between 1 and 1000");
+
+		g_heldControls = controls;
+		g_controlReleaseTime = GET_GAME_TIMER() + holdMilliseconds;
+
+		return Serialise(202, json{
+			{ "status", "holding" },
+			{ "controls", controls.size() },
+			{ "holdMilliseconds", holdMilliseconds },
+		});
+	}
+
+	Response ReleaseControls()
+	{
+		g_heldControls.clear();
+		g_controlReleaseTime = 0;
+		return Serialise(200, json{ { "status", "released" } });
+	}
+
+	void TickControls()
+	{
+		if (g_heldControls.empty())
+			return;
+
+		if (GET_GAME_TIMER() >= g_controlReleaseTime)
+		{
+			g_heldControls.clear();
+			g_controlReleaseTime = 0;
+			return;
 		}
 
-		return Serialise(202, json{ { "status", "queuedForNextFrame" }, { "controls", controls.size() } });
+		for (const ControlRequest& control : g_heldControls)
+			PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, control.control, control.value);
 	}
 }

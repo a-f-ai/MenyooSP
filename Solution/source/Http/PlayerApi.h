@@ -29,5 +29,7 @@ namespace Http::PlayerApi
 
 	Response EnterVehicle(const EnterVehicleRequest& request);
 	Response Teleport(const TeleportRequest& request);
-	Response ApplyControls(const std::vector<ControlRequest>& controls);
+	Response ApplyControls(const std::vector<ControlRequest>& controls, int holdMilliseconds);
+	Response ReleaseControls();
+	void TickControls();
 }

@@ -471,7 +471,8 @@ namespace Http::Server
 				}) },
 				{ "player", json::array({
 					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
-					"POST /player/input  {controls:[{control,value}, ...]} writes native GTA input for the next frame; control is 0..337 and value is -1..1",
+					"POST /player/input  {controls:[{control,value}, ...], holdMilliseconds} holds native GTA input on every game tick; control is 0..337 and value is -1..1",
+					"POST /player/input/release  releases every virtual control immediately",
 					"POST /debug/player/teleport  {x,y,z} moves the player exactly to an explicit debug position",
 				}) },
 				{ "catalog", json::array({
@@ -740,8 +741,18 @@ namespace Http::Server
 
 			server.Post("/player/input", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request& req) {
-					const std::vector<PlayerApi::ControlRequest> controls = ParseControls(ParseObjectBody(req));
-					return std::function<Response()>([controls] { return PlayerApi::ApplyControls(controls); });
+					const json body = ParseObjectBody(req);
+					const std::vector<PlayerApi::ControlRequest> controls = ParseControls(body);
+					const int holdMilliseconds = RequiredInteger(body, "holdMilliseconds");
+					if (!PlayerInput::IsHoldMillisecondsValid(holdMilliseconds))
+						throw ApiError(400, "field \"holdMilliseconds\" must be between 1 and 1000");
+					return std::function<Response()>([controls, holdMilliseconds] { return PlayerApi::ApplyControls(controls, holdMilliseconds); });
+				});
+			});
+
+			server.Post("/player/input/release", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request&) {
+					return std::function<Response()>([] { return PlayerApi::ReleaseControls(); });
 				});
 			});
 

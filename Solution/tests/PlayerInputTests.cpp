@@ -42,12 +42,22 @@ namespace
 		Check(!Http::PlayerInput::IsValueValid(-1.01f), "value below the range is rejected");
 		Check(!Http::PlayerInput::IsValueValid(1.01f), "value above the range is rejected");
 	}
+
+	void HoldDurationHasAnExplicitBound()
+	{
+		std::printf("input holds have an explicit bound\n");
+		Check(Http::PlayerInput::IsHoldMillisecondsValid(1), "a one millisecond hold is valid");
+		Check(Http::PlayerInput::IsHoldMillisecondsValid(1000), "a one second hold is valid");
+		Check(!Http::PlayerInput::IsHoldMillisecondsValid(0), "a zero length hold is rejected");
+		Check(!Http::PlayerInput::IsHoldMillisecondsValid(1001), "holds above one second are rejected");
+	}
 }
 
 int main()
 {
 	ControlIdsMatchTheGtaInputTable();
 	AnalogueValuesStayInTheNativeRange();
+	HoldDurationHasAnExplicitBound();
 
 	if (g_failures == 0)
 	{

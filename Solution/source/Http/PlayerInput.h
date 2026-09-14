@@ -18,4 +18,9 @@ namespace Http::PlayerInput
 	{
 		return std::isfinite(value) && value >= -1.0f && value <= 1.0f;
 	}
+
+	inline bool IsHoldMillisecondsValid(int milliseconds)
+	{
+		return milliseconds >= 1 && milliseconds <= 1000;
+	}
 }

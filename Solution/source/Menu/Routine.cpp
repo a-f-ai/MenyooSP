@@ -15,6 +15,7 @@
 #include "MenuConfig.h"
 #include "../Submenus/Spooner/ImGuiSpooner.h"
 #include "..\Http\HttpServer.h"
+#include "..\Http\PlayerApi.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
 #include "..\Submenus\Spooner\CharacterPicker.h"
 #include "..\Misc\PedLod.h"
@@ -291,6 +292,7 @@ inline void MenyooMain()
 		sub::Spooner::CharacterPicker::Tick();
 		sub::Spooner::CameraPaths::Tick();
 		Http::Server::DrainCommands();
+		Http::PlayerApi::TickControls();
 		WAIT(0);
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - looping");
