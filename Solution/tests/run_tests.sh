@@ -18,6 +18,9 @@ mkdir -p "$build/Http" "$build/Util" "$build/Submenus/Spooner"
 cp "$source_root/Http/CommandQueue.h" "$source_root/Http/CommandQueue.cpp" "$build/Http/"
 cp "$here/CommandQueueTests.cpp" "$build/Http/"
 
+cp "$source_root/Http/PlayerInput.h" "$build/Http/"
+cp "$here/PlayerInputTests.cpp" "$build/Http/"
+
 cp "$source_root/Submenus/Spooner/CameraPath.h" \
    "$source_root/Submenus/Spooner/CameraPath.cpp" "$build/Submenus/Spooner/"
 cp "$here/CameraPathTests.cpp" "$build/Submenus/Spooner/"
@@ -51,6 +54,14 @@ echo "--- command queue ---"
     "$build/Http/CommandQueue.cpp" "$build/Http/CommandQueueTests.cpp" \
     -o "$build/queue_tests"
 "$build/queue_tests"
+
+echo
+echo "--- player input validation ---"
+"$compiler" "${flags[@]}" \
+    -I"$build/Http" \
+    "$build/Http/PlayerInputTests.cpp" \
+    -o "$build/player_input_tests"
+"$build/player_input_tests"
 
 echo
 echo "--- map name repair ---"

@@ -17,6 +17,8 @@
 #include "Json.h"
 #include "MapApi.h"
 #include "ModelApi.h"
+#include "PlayerApi.h"
+#include "PlayerInput.h"
 #include "WorldApi.h"
 
 #include "../Natives/natives2.h"
@@ -178,6 +180,37 @@ namespace Http::Server
 					" models per request, got " + std::to_string(models.size()) +
 					"; every one of them has to be streamed in to be measured");
 			return models;
+		}
+
+		int RequiredInteger(const json& body, const char* name)
+		{
+			const json& value = Field(body, name);
+			if (!value.is_number_integer())
+				throw ApiError(400, std::string("field \"") + name + "\" must be an integer");
+			return value.get<int>();
+		}
+
+		std::vector<PlayerApi::ControlRequest> ParseControls(const json& body)
+		{
+			const json& source = Field(body, "controls");
+			if (!source.is_array() || source.empty() || source.size() > 16)
+				throw ApiError(400, "field \"controls\" must contain between 1 and 16 controls");
+
+			std::vector<PlayerApi::ControlRequest> controls;
+			controls.reserve(source.size());
+			for (const json& item : source)
+			{
+				if (!item.is_object())
+					throw ApiError(400, "every item in \"controls\" must be an object");
+				const int control = RequiredInteger(item, "control");
+				const float value = Number(item, "value");
+				if (!PlayerInput::IsControlIdValid(control))
+					throw ApiError(400, "field \"control\" must be between 0 and 337");
+				if (!PlayerInput::IsValueValid(value))
+					throw ApiError(400, "field \"value\" must be between -1 and 1");
+				controls.push_back(PlayerApi::ControlRequest{ control, value });
+			}
+			return controls;
 		}
 
 		// Named rather than a raw bitmask: a caller reading "map" knows what it
@@ -436,6 +469,11 @@ namespace Http::Server
 					"     the only way to see static map geometry - a building is not an entity and /world/nearby cannot see it",
 					"GET /world/nearby?x=&y=&z=&radius=&type=&limit=  world entities near a point",
 				}) },
+				{ "player", json::array({
+					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
+					"POST /player/input  {controls:[{control,value}, ...]} writes native GTA input for the next frame; control is 0..337 and value is -1..1",
+					"POST /debug/player/teleport  {x,y,z} moves the player exactly to an explicit debug position",
+				}) },
 				{ "catalog", json::array({
 					"GET /catalog/peds?q=&limit=&offset=&verify=",
 					"GET /catalog/vehicles?q=&filter=<class>&verify=",
@@ -684,6 +722,37 @@ namespace Http::Server
 						return WorldApi::GetNearby(x, y, z, radius, type, limit);
 					});
 				}, 4000ms);
+			});
+
+			// ---- player ----
+
+			server.Post("/player/enter-vehicle", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const json body = ParseObjectBody(req);
+					const int vehicleId = RequiredInteger(body, "vehicleId");
+					if (vehicleId <= 0)
+						throw ApiError(400, "field \"vehicleId\" must be a live positive entity id");
+					return std::function<Response()>([vehicleId] {
+						return PlayerApi::EnterVehicle(PlayerApi::EnterVehicleRequest{ vehicleId });
+					});
+				});
+			});
+
+			server.Post("/player/input", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const std::vector<PlayerApi::ControlRequest> controls = ParseControls(ParseObjectBody(req));
+					return std::function<Response()>([controls] { return PlayerApi::ApplyControls(controls); });
+				});
+			});
+
+			server.Post("/debug/player/teleport", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const json body = ParseObjectBody(req);
+					const PlayerApi::TeleportRequest destination{
+						Number(body, "x"), Number(body, "y"), Number(body, "z"),
+					};
+					return std::function<Response()>([destination] { return PlayerApi::Teleport(destination); });
+				});
 			});
 
 			// ---- catalog ----

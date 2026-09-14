@@ -1,0 +1,21 @@
+/*
+* Menyoo PC - Grand Theft Auto V single-player trainer mod
+*
+* Validation shared by the HTTP parser and the game-thread player API.
+*/
+#pragma once
+
+#include <cmath>
+
+namespace Http::PlayerInput
+{
+	inline bool IsControlIdValid(int control)
+	{
+		return control >= 0 && control <= 337;
+	}
+
+	inline bool IsValueValid(float value)
+	{
+		return std::isfinite(value) && value >= -1.0f && value <= 1.0f;
+	}
+}
