@@ -739,6 +739,7 @@ namespace sub
 			UINT8 drivingStyleIndex = 0;
 			bool bPushEmAway = true;
 			bool bRandDestinationMode = false;
+			bool hasExplicitDestination = false;
 			float pushRadius = 4.0f;
 			bool initialSet = false;
 
@@ -749,6 +750,7 @@ namespace sub
 				drivingStyle = targetDrivingStyle;
 				bPushEmAway = pushEntities;
 				bRandDestinationMode = false;
+				hasExplicitDestination = true;
 				TurnOn();
 			}
 
@@ -763,6 +765,7 @@ namespace sub
 				GenericLoopedMode::TurnOff();
 
 				initialSet = false;
+				hasExplicitDestination = false;
 
 				CLEAR_PED_TASKS(myPed.Handle());
 			
@@ -779,9 +782,9 @@ namespace sub
 			{
 				myPed = PLAYER_PED_ID();
 			
-				if (myPed.IsInVehicle() && (IS_WAYPOINT_ACTIVE() || bRandDestinationMode))
+				if (myPed.IsInVehicle() && (IS_WAYPOINT_ACTIVE() || bRandDestinationMode || hasExplicitDestination))
 				{
-					if (!initialSet)
+					if (!initialSet && IS_WAYPOINT_ACTIVE() && !hasExplicitDestination)
 					{
 						destination = GET_BLIP_COORDS(GET_FIRST_BLIP_INFO_ID(BlipIcon::Waypoint));
 					}
@@ -814,7 +817,7 @@ namespace sub
 							initialSet = false;
 						}
 					}
-					else if (!initialSet && IS_WAYPOINT_ACTIVE())
+					else if (!initialSet && IS_WAYPOINT_ACTIVE() && !hasExplicitDestination)
 					{
 						destination = GET_BLIP_COORDS(GET_FIRST_BLIP_INFO_ID(BlipIcon::Waypoint));
 					}

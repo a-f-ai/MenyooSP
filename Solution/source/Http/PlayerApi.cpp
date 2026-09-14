@@ -141,6 +141,6 @@ namespace Http::PlayerApi
 		}
 
 		for (const ControlRequest& control : g_heldControls)
-			PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, control.control, control.value);
+			PAD::SET_CONTROL_VALUE_NEXT_FRAME(2, control.control, control.value);
 	}
 }
