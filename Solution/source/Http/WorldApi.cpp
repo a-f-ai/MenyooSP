@@ -168,6 +168,11 @@ namespace Http::WorldApi
 				{ "id", vehicle.GetHandle() },
 				{ "model", IntToHexString(vehicle.Model().hash, true) },
 				{ "name", get_vehicle_model_label(vehicle.Model(), true) },
+				{ "speedMetresPerSecond", vehicle.GetSpeed() },
+				{ "wheelSpeedMetresPerSecond", vehicle.GetWheelSpeed() },
+				{ "engineRunning", vehicle.GetEngineRunning() },
+				{ "driveable", vehicle.GetDriveable() },
+				{ "collisionDisabled", GET_ENTITY_COLLISION_DISABLED(vehicle.GetHandle()) != 0 },
 			};
 		}
 
