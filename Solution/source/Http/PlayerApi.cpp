@@ -10,6 +10,7 @@
 #include "../Scripting/GTAvehicle.h"
 #include "../Scripting/Tasks.h"
 #include "../Scripting/enums.h"
+#include "../Submenus/VehicleOptions.h"
 
 #include <json/single_include/nlohmann/json.hpp>
 
@@ -99,6 +100,32 @@ namespace Http::PlayerApi
 		g_heldControls.clear();
 		g_controlReleaseTime = 0;
 		return Serialise(200, json{ { "status", "released" } });
+	}
+
+	Response DriveTo(const DriveToRequest& request)
+	{
+		GTAped player = Player();
+		if (!player.Exists())
+			return Fail(503, "the player ped does not exist yet; the game may still be loading");
+
+		GTAvehicle vehicle = player.CurrentVehicle();
+		if (!vehicle.Exists())
+			return Fail(409, "the player must be driving a vehicle before starting auto drive");
+		if (!vehicle.GetDriveable())
+			return Fail(422, "the current vehicle is not driveable");
+
+		sub::VehicleAutoDrive::Start(Vector3(request.x, request.y, request.z), request.speed, request.drivingStyle, request.pushEntities);
+		return Serialise(202, json{
+			{ "status", "driving" },
+			{ "destination", { { "x", request.x }, { "y", request.y }, { "z", request.z } } },
+			{ "speedMetresPerSecond", request.speed },
+		});
+	}
+
+	Response StopDriving()
+	{
+		sub::VehicleAutoDrive::Stop();
+		return Serialise(200, json{ { "status", "stopped" } });
 	}
 
 	void TickControls()

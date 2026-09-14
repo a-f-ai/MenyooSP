@@ -473,6 +473,8 @@ namespace Http::Server
 					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
 					"POST /player/input  {controls:[{control,value}, ...], holdMilliseconds} holds native GTA input on every game tick; control is 0..337 and value is -1..1",
 					"POST /player/input/release  releases every virtual control immediately",
+					"POST /player/drive-to  {x,y,z,speed,drivingStyle,pushEntities} uses Menyoo's vehicle auto drive for the current player vehicle",
+					"POST /player/drive-to/stop  stops the active Menyoo auto drive",
 					"POST /debug/player/teleport  {x,y,z} moves the player exactly to an explicit debug position",
 				}) },
 				{ "catalog", json::array({
@@ -753,6 +755,28 @@ namespace Http::Server
 			server.Post("/player/input/release", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request&) {
 					return std::function<Response()>([] { return PlayerApi::ReleaseControls(); });
+				});
+			});
+
+			server.Post("/player/drive-to", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const json body = ParseObjectBody(req);
+					const json& pushEntities = Field(body, "pushEntities");
+					if (!pushEntities.is_boolean())
+						throw ApiError(400, "field \"pushEntities\" must be a boolean");
+					const PlayerApi::DriveToRequest drive{
+						Number(body, "x"), Number(body, "y"), Number(body, "z"),
+						Number(body, "speed"), RequiredInteger(body, "drivingStyle"), pushEntities.get<bool>(),
+					};
+					if (!std::isfinite(drive.speed) || drive.speed <= 0.0f || drive.speed > 100.0f)
+						throw ApiError(400, "field \"speed\" must be between 0 and 100 metres per second");
+					return std::function<Response()>([drive] { return PlayerApi::DriveTo(drive); });
+				});
+			});
+
+			server.Post("/player/drive-to/stop", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request&) {
+					return std::function<Response()>([] { return PlayerApi::StopDriving(); });
 				});
 			});
 

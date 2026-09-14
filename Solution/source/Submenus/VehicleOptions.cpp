@@ -742,6 +742,16 @@ namespace sub
 			float pushRadius = 4.0f;
 			bool initialSet = false;
 
+			void Start(const Vector3& target, float targetSpeed, int targetDrivingStyle, bool pushEntities)
+			{
+				destination = target;
+				speed = targetSpeed;
+				drivingStyle = targetDrivingStyle;
+				bPushEmAway = pushEntities;
+				bRandDestinationMode = false;
+				TurnOn();
+			}
+
 			void TurnOn() override
 			{
 				GenericLoopedMode::TurnOn();
@@ -945,6 +955,14 @@ namespace sub
 			}
 		};
 		MethodsClass Methods;
+		void Start(const Vector3& destination, float speed, int drivingStyle, bool pushEntities)
+		{
+			Methods.Start(destination, speed, drivingStyle, pushEntities);
+		}
+		void Stop()
+		{
+			Methods.TurnOff();
+		}
 
 		void ToggleOnOff()
 		{

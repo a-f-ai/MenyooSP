@@ -27,9 +27,19 @@ namespace Http::PlayerApi
 		float value;
 	};
 
+	struct DriveToRequest
+	{
+		float x, y, z;
+		float speed;
+		int drivingStyle;
+		bool pushEntities;
+	};
+
 	Response EnterVehicle(const EnterVehicleRequest& request);
 	Response Teleport(const TeleportRequest& request);
 	Response ApplyControls(const std::vector<ControlRequest>& controls, int holdMilliseconds);
 	Response ReleaseControls();
+	Response DriveTo(const DriveToRequest& request);
+	Response StopDriving();
 	void TickControls();
 }
