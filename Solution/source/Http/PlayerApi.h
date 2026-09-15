@@ -35,10 +35,17 @@ namespace Http::PlayerApi
 		bool pushEntities;
 	};
 
+	struct ControlDiagnosticRequest
+	{
+		int controlGroup;
+		int control;
+	};
+
 	Response EnterVehicle(const EnterVehicleRequest& request);
 	Response Teleport(const TeleportRequest& request);
 	Response ApplyControls(const std::vector<ControlRequest>& controls, int holdMilliseconds);
 	Response ReleaseControls();
+	Response GetControlDiagnostic(const ControlDiagnosticRequest& request);
 	Response DriveTo(const DriveToRequest& request);
 	Response StopDriving();
 	void TickControls();

@@ -51,6 +51,15 @@ namespace
 		Check(!Http::PlayerInput::IsHoldMillisecondsValid(0), "a zero length hold is rejected");
 		Check(!Http::PlayerInput::IsHoldMillisecondsValid(1001), "holds above one second are rejected");
 	}
+
+	void ControlGroupsHaveAnExplicitBound()
+	{
+		std::printf("control groups have an explicit bound\n");
+		Check(Http::PlayerInput::IsControlGroupValid(0), "the player control group is valid");
+		Check(Http::PlayerInput::IsControlGroupValid(2), "the script control group is valid");
+		Check(!Http::PlayerInput::IsControlGroupValid(-1), "negative control groups are rejected");
+		Check(!Http::PlayerInput::IsControlGroupValid(3), "unknown control groups are rejected");
+	}
 }
 
 int main()
@@ -58,6 +67,7 @@ int main()
 	ControlIdsMatchTheGtaInputTable();
 	AnalogueValuesStayInTheNativeRange();
 	HoldDurationHasAnExplicitBound();
+	ControlGroupsHaveAnExplicitBound();
 
 	if (g_failures == 0)
 	{

@@ -9,6 +9,13 @@
 
 namespace Http::PlayerInput
 {
+	constexpr int kInjectedControlGroup = 2;
+
+	inline bool IsControlGroupValid(int controlGroup)
+	{
+		return controlGroup >= 0 && controlGroup <= 2;
+	}
+
 	inline bool IsControlIdValid(int control)
 	{
 		return control >= 0 && control <= 337;

@@ -20,7 +20,16 @@ namespace Http::PlayerApi
 {
 	namespace
 	{
+		struct ControlDiagnostic
+		{
+			int control;
+			float requestedValue;
+			bool lastInjectionAttempted;
+			bool lastInjectionAccepted;
+		};
+
 		std::vector<ControlRequest> g_heldControls;
+		std::vector<ControlDiagnostic> g_lastControls;
 		int g_controlReleaseTime = 0;
 
 		Response Serialise(int status, const json& payload)
@@ -86,6 +95,10 @@ namespace Http::PlayerApi
 			return Fail(400, "holdMilliseconds must be between 1 and 1000");
 
 		g_heldControls = controls;
+		g_lastControls.clear();
+		g_lastControls.reserve(controls.size());
+		for (const ControlRequest& control : controls)
+			g_lastControls.push_back(ControlDiagnostic{ control.control, control.value, false, false });
 		g_controlReleaseTime = GET_GAME_TIMER() + holdMilliseconds;
 
 		return Serialise(202, json{
@@ -100,6 +113,36 @@ namespace Http::PlayerApi
 		g_heldControls.clear();
 		g_controlReleaseTime = 0;
 		return Serialise(200, json{ { "status", "released" } });
+	}
+
+	Response GetControlDiagnostic(const ControlDiagnosticRequest& request)
+	{
+		if (!PlayerInput::IsControlGroupValid(request.controlGroup))
+			return Fail(400, "controlGroup must be between 0 and 2");
+		if (!PlayerInput::IsControlIdValid(request.control))
+			return Fail(400, "control must be between 0 and 337");
+
+		for (const ControlDiagnostic& control : g_lastControls)
+		{
+			if (control.control != request.control)
+				continue;
+
+			const bool holding = !g_heldControls.empty() && GET_GAME_TIMER() < g_controlReleaseTime;
+			return Serialise(200, json{
+				{ "controlGroup", request.controlGroup },
+				{ "control", request.control },
+				{ "injectedControlGroup", PlayerInput::kInjectedControlGroup },
+				{ "requestedValue", control.requestedValue },
+				{ "holding", holding },
+				{ "lastInjectionAttempted", control.lastInjectionAttempted },
+				{ "lastInjectionAccepted", control.lastInjectionAccepted },
+				{ "controlEnabled", PAD::IS_CONTROL_ENABLED(request.controlGroup, request.control) != 0 },
+				{ "controlPressed", PAD::IS_CONTROL_PRESSED(request.controlGroup, request.control) != 0 },
+				{ "controlNormal", PAD::GET_CONTROL_NORMAL(request.controlGroup, request.control) },
+			});
+		}
+
+		return Fail(404, "the requested control was not part of the last input hold");
 	}
 
 	Response DriveTo(const DriveToRequest& request)
@@ -140,7 +183,12 @@ namespace Http::PlayerApi
 			return;
 		}
 
-		for (const ControlRequest& control : g_heldControls)
-			PAD::SET_CONTROL_VALUE_NEXT_FRAME(2, control.control, control.value);
+		for (size_t index = 0; index < g_heldControls.size(); ++index)
+		{
+			const ControlRequest& control = g_heldControls[index];
+			g_lastControls[index].lastInjectionAttempted = true;
+			g_lastControls[index].lastInjectionAccepted =
+				PAD::SET_CONTROL_VALUE_NEXT_FRAME(PlayerInput::kInjectedControlGroup, control.control, control.value) != 0;
+		}
 	}
 }

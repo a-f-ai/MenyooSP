@@ -473,6 +473,7 @@ namespace Http::Server
 					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
 					"POST /player/input  {controls:[{control,value}, ...], holdMilliseconds} holds native GTA input on every game tick; control is 0..337 and value is -1..1",
 					"POST /player/input/release  releases every virtual control immediately",
+					"GET /player/input/diagnostic?controlGroup=&control=  reports the last held control's native acceptance and live PAD state for group 0..2",
 					"POST /player/drive-to  {x,y,z,speed,drivingStyle,pushEntities} uses Menyoo's vehicle auto drive for the current player vehicle",
 					"POST /player/drive-to/stop  stops the active Menyoo auto drive",
 					"POST /debug/player/teleport  {x,y,z} moves the player exactly to an explicit debug position",
@@ -755,6 +756,24 @@ namespace Http::Server
 			server.Post("/player/input/release", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request&) {
 					return std::function<Response()>([] { return PlayerApi::ReleaseControls(); });
+				});
+			});
+
+			server.Get("/player/input/diagnostic", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					if (!req.has_param("controlGroup"))
+						throw ApiError(400, "missing required query parameter \"controlGroup\"");
+					if (!req.has_param("control"))
+						throw ApiError(400, "missing required query parameter \"control\"");
+					const PlayerApi::ControlDiagnosticRequest diagnostic{
+						IntParam(req, "controlGroup", 0),
+						IntParam(req, "control", 0),
+					};
+					if (!PlayerInput::IsControlGroupValid(diagnostic.controlGroup))
+						throw ApiError(400, "query parameter \"controlGroup\" must be between 0 and 2");
+					if (!PlayerInput::IsControlIdValid(diagnostic.control))
+						throw ApiError(400, "query parameter \"control\" must be between 0 and 337");
+					return std::function<Response()>([diagnostic] { return PlayerApi::GetControlDiagnostic(diagnostic); });
 				});
 			});
 
