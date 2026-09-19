@@ -19,5 +19,4 @@ namespace Http
     };
     Response RunSpidermanBike(SpidermanBikeRuntime& game);
     Response MakeSpidermanOnBike();
-    bool IsSpidermanBikeChord(bool control,bool shift,bool alt);
 }

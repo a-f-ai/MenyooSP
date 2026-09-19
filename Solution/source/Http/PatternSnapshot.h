@@ -12,10 +12,14 @@ namespace Http::Pattern
     struct Vec { double x=0, y=0, z=0; };
     struct Transform { Vec position, rotation; };
     struct Bounds { Vec min, max; };
+    enum class Scope { World, Spooner };
+    struct ScopeDecision { bool included; std::string reason; };
+    ScopeDecision SelectForScope(Scope scope,int entity,int player,int currentVehicle,bool spoonerOwned);
     struct Probe { std::string sample; bool hit; int entity; Vec point; };
     Response SupportEdges(int entity, Bounds bounds, const std::vector<Probe>& samples, const std::map<int,Bounds>& supports);
     struct Request
     {
+        Scope scope;
         std::string originKind, frameKind;
         Vec origin;
         Transform frame;
@@ -48,6 +52,7 @@ namespace Http::Pattern
         void Remove(int handle);
         void Clear();
         Response Lookup(int handle, unsigned long model) const;
+        bool Tracks(int handle) const;
         json Maps() const;
     };
     SourceRegistry& Sources();

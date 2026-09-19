@@ -21,6 +21,7 @@ The request is explicit; there are no implicit defaults.
 
 ```json
 {
+  "scope": "spooner",
   "origin": {"kind": "player"},
   "radius": 45.0,
   "types": ["ped", "vehicle", "prop"],
@@ -42,6 +43,22 @@ The request is explicit; there are no implicit defaults.
   }
 }
 ```
+
+For pattern capture, callers MUST send `scope:"spooner"`. It selects entities
+owned by Spooner EntityDb or tracked by the map loader, excluding the current
+player and the player's current vehicle even when Spooner owns them. Selection
+is applied after the requested radius/type filter and before `maxEntities`.
+The response carries `scope` and `excluded:{count,entities:[{id,type,state,
+reason}]}`. Each excluded candidate has `state:"out-of-scope"` and reason
+`player`, `player_current_vehicle`, or `not_spooner_owned`. This is explicit
+selection, not partial capture: every selected entity must still satisfy all
+requested include fields or the entire request fails.
+
+`scope:"world"` retains the original all-world selection. Omitting `scope`
+retains that existing request's behavior for compatibility; it does not infer
+Spooner scope or retry. Unknown scope values fail with `400`. In world scope,
+an untracked player has no Spooner-authored `dynamic` metadata and exact physics
+capture returns `409`; it is never replaced with `true` or `!IS_ENTITY_STATIC`.
 
 `origin` is a discriminated union:
 

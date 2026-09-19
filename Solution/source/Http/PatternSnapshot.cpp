@@ -57,8 +57,15 @@ namespace Http::Pattern
     }
     Request Parse(const json& b)
     {
-        Keys(b,{"origin","radius","types","maxEntities","frame","supportProbe","include"});
+        if(b.contains("scope")) Keys(b,{"scope","origin","radius","types","maxEntities","frame","supportProbe","include"});
+        if(!b.contains("scope")) Keys(b,{"origin","radius","types","maxEntities","frame","supportProbe","include"});
         Request r{};
+        r.scope=Scope::World;
+        if(b.contains("scope"))
+        {
+            if(b["scope"]!="world" && b["scope"]!="spooner") throw ApiError(400,"scope must be world or spooner");
+            if(b["scope"]=="spooner") r.scope=Scope::Spooner;
+        }
         r.originKind=Kind(b["origin"]);
         if(r.originKind=="player") Keys(b["origin"],{"kind"});
         if(r.originKind=="position") { Keys(b["origin"],{"kind","position"}); r.origin=Vector(b["origin"]["position"]); }
@@ -92,6 +99,14 @@ namespace Http::Pattern
         return r;
     }
     json Point(Vec v) { return {{"x",v.x},{"y",v.y},{"z",v.z}}; }
+    ScopeDecision SelectForScope(Scope scope,int entity,int player,int currentVehicle,bool spoonerOwned)
+    {
+        if(scope==Scope::World) return {true,"selected"};
+        if(entity==player) return {false,"player"};
+        if(currentVehicle!=0 && entity==currentVehicle) return {false,"player_current_vehicle"};
+        if(!spoonerOwned) return {false,"not_spooner_owned"};
+        return {true,"selected"};
+    }
     json Pose(Transform t) { return {{"position",Point(t.position)},{"rotation",{{"pitch",t.rotation.x},{"roll",t.rotation.y},{"yaw",t.rotation.z}}}}; }
     std::array<double,9> RotationMatrix(Vec v)
     {
@@ -151,6 +166,7 @@ namespace Http::Pattern
         m_maps.erase(map);
     }
     void SourceRegistry::Clear() { m_entities.clear(); m_maps.clear(); }
+    bool SourceRegistry::Tracks(int handle) const { return m_entities.find(handle)!=m_entities.end(); }
     Response SourceRegistry::Lookup(int handle,unsigned long model) const
     {
         auto source=m_entities.find(handle);

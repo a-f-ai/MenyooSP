@@ -111,14 +111,25 @@ namespace Http::Pattern
         GTAmemory::GetEntityHandles(handles,Native(origin),static_cast<float>(request.radius));
         std::sort(handles.begin(),handles.end()); handles.erase(std::unique(handles.begin(),handles.end()),handles.end());
         std::vector<int> selected;
+        std::map<int,const SpoonerEntity*> db;
+        for(const auto& e:sub::Spooner::Databases::EntityDb) db.emplace(e.handle.GetHandle(),&e);
+        const int player=PLAYER_PED_ID();
+        const int currentVehicle=DOES_ENTITY_EXIST(player)?GET_VEHICLE_PED_IS_IN(player,false):0;
+        json excluded=json::array();
         for(int id:handles)
         {
             if(!DOES_ENTITY_EXIST(id)) return Error(409,"entity pool changed during capture");
-            if(std::find(request.types.begin(),request.types.end(),GET_ENTITY_TYPE(id))!=request.types.end() && Distance(V(GTAentity(id).GetPosition()),origin)<=request.radius) selected.push_back(id);
+            const int type=GET_ENTITY_TYPE(id);
+            if(std::find(request.types.begin(),request.types.end(),type)==request.types.end() || Distance(V(GTAentity(id).GetPosition()),origin)>request.radius) continue;
+            const auto decision=SelectForScope(request.scope,id,player,currentVehicle,db.count(id)!=0 || Sources().Tracks(id));
+            if(!decision.included)
+            {
+                excluded.push_back({{"id",id},{"type",type==1?"ped":type==2?"vehicle":"prop"},{"state","out-of-scope"},{"reason",decision.reason}});
+                continue;
+            }
+            selected.push_back(id);
         }
         if(selected.size()>static_cast<size_t>(request.maxEntities)) return {409,json{{"error","entity limit exceeded"},{"observedCount",selected.size()},{"maxEntities",request.maxEntities}}.dump()};
-        std::map<int,const SpoonerEntity*> db;
-        for(const auto& e:sub::Spooner::Databases::EntityDb) db.emplace(e.handle.GetHandle(),&e);
         std::vector<Captured> captured;
         for(int id:selected)
         {
@@ -214,7 +225,8 @@ namespace Http::Pattern
         }
         if(GET_FRAME_COUNT()!=frameNumber) return Error(409,"snapshot crossed a game frame");
         if(expired()) return Error(503,"snapshot exceeded its 3500 ms capture budget; no partial capture returned");
-        return {200,json{{"origin",Point(origin)},{"frame",Pose(frame)},{"loadedMaps",Sources().Maps()},{"count",entities.size()},
+        return {200,json{{"scope",request.scope==Scope::Spooner?"spooner":"world"},{"excluded",{{"count",excluded.size()},{"entities",excluded}}},
+            {"origin",Point(origin)},{"frame",Pose(frame)},{"loadedMaps",Sources().Maps()},{"count",entities.size()},
             {"truncated",false},{"entities",entities},{"supportEdges",edges},{"captureMs",std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-started).count()}}.dump(2,' ',false,json::error_handler_t::replace)};
     }
 }

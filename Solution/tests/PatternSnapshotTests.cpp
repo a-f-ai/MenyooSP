@@ -11,6 +11,17 @@ int main()
 {
     auto body = json::parse(R"({"origin":{"kind":"player"},"radius":45,"types":["ped","vehicle","prop"],"maxEntities":400,"frame":{"kind":"world"},"supportProbe":{"enabled":true,"maxDrop":3,"sample":"center-and-four-corners"},"include":{"geometry":true,"physics":true,"attachments":true,"pedState":true,"vehicleCustomization":true,"propCustomization":true,"sourceProvenance":true}})");
     Check(Parse(body).radius == 45, "explicit request accepted");
+    Check(Parse(body).scope==Scope::World,"existing request retains world selection");
+    auto scoped=body;scoped["scope"]="spooner";
+    Check(Parse(scoped).scope==Scope::Spooner,"explicit spooner scope accepted");
+    scoped["scope"]="nearest";Check(Rejected(scoped),"unknown scope rejected");
+    Check(SelectForScope(Scope::World,7,7,8,false).included,"world scope still includes untracked player");
+    auto playerScope=SelectForScope(Scope::Spooner,7,7,8,true);
+    Check(!playerScope.included && playerScope.reason=="player","spooner scope explicitly excludes even a tracked player");
+    auto vehicleScope=SelectForScope(Scope::Spooner,8,7,8,true);
+    Check(!vehicleScope.included && vehicleScope.reason=="player_current_vehicle","spooner scope explicitly excludes current vehicle");
+    Check(!SelectForScope(Scope::Spooner,9,7,8,false).included,"unowned world entity is out of scope");
+    Check(SelectForScope(Scope::Spooner,9,7,8,true).included,"spooner owned entity is selected");
     for (auto it = body.begin(); it != body.end(); ++it) { auto missing = body; missing.erase(it.key()); Check(Rejected(missing), "missing top-level field rejected"); }
     for (auto it = body["include"].begin(); it != body["include"].end(); ++it) { auto missing = body; missing["include"].erase(it.key()); Check(Rejected(missing), "missing include flag rejected"); }
     auto bad = body; bad["extra"] = true; Check(Rejected(bad), "unknown field rejected");

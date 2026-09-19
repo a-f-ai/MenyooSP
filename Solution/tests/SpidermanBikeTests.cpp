@@ -37,6 +37,5 @@ int main()
         if(game.fail=="collision") check(game.bike==0,"collision failure stops before spawning");
         if(game.fail=="seat") check(game.bike==9 && game.vehicle==0,"seat failure reports retained bike without invented rollback");
     }
-    check(IsSpidermanBikeChord(true,true,false) && !IsSpidermanBikeChord(true,false,false) && !IsSpidermanBikeChord(false,true,false) && !IsSpidermanBikeChord(true,true,true),"hotkey requires ctrl and shift without alt");
     return failures?1:0;
 }

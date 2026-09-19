@@ -1,7 +1,6 @@
 #include "SpidermanBike.h"
 namespace Http
 {
-    bool IsSpidermanBikeChord(bool control,bool shift,bool alt) { return control && shift && !alt; }
     Response RunSpidermanBike(SpidermanBikeRuntime& game)
     {
         using json=nlohmann::json;

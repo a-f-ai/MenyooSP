@@ -530,7 +530,7 @@ namespace Http::Server
 					"POST /world/raycast  {from:{x,y,z}, to:{x,y,z}, include?:[map|vehicles|peds|objects|foliage|everything], ignoreEntity?}",
 					"     the only way to see static map geometry - a building is not an entity and /world/nearby cannot see it",
 					"GET /world/nearby?x=&y=&z=&radius=&type=&limit=  world entities near a point",
-					"POST /world/pattern-snapshot {origin,radius,types,maxEntities,frame,supportProbe,include}; every field required; see PATTERN_CAPTURE_API.md; read-only, no partial success",
+					"POST /world/pattern-snapshot {scope:spooner|world,origin,radius,types,maxEntities,frame,supportProbe,include}; pattern capture uses explicit spooner scope and receives excluded IDs/reasons; legacy omitted scope is world; see PATTERN_CAPTURE_API.md; read-only, no partial success",
 				}) },
 				{ "player", json::array({
 					"POST /player/model  {model} or {alias, variant?}; exact aliases come from Characters.json; multi-variant aliases require an explicit defaultVariant or variant",
