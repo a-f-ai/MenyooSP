@@ -58,6 +58,16 @@ flags=(-std=c++20 -O1 -w)
 echo "--- HTTP routing boundary ---"
 python3 "$here/HttpRoutingTests.py"
 
+echo "--- pattern snapshot ---"
+"$compiler" "${flags[@]}" -pthread -I"$source_root/Http" -I"$source_root/../external" \
+    "$source_root/Http/PatternSnapshot.cpp" "$here/PatternSnapshotTests.cpp" -o "$build/pattern_tests"
+"$build/pattern_tests"
+
+echo "--- spiderman bike action ---"
+"$compiler" "${flags[@]}" -I"$source_root/Http" -I"$source_root/../external" \
+    "$source_root/Http/SpidermanBike.cpp" "$here/SpidermanBikeTests.cpp" -o "$build/bike_tests"
+"$build/bike_tests"
+
 echo
 
 echo "--- command queue ---"

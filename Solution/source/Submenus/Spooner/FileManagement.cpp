@@ -8,6 +8,7 @@
 * (at your option) any later version.
 */
 #include "FileManagement.h"
+#include "../../Http/PatternSnapshot.h"
 
 #include "..\..\macros.h"
 
@@ -2186,10 +2187,18 @@ namespace sub::Spooner
 			std::unordered_set<Hash> vModelHashes;
 			std::vector<SpoonerEntityWithInitHandle> newDb;
 			std::vector<SpoonerMarkerWithInitHandle> newMarkerDb;
+			std::string sourcePath = filePath;
+			std::replace(sourcePath.begin(), sourcePath.end(), '\\', '/');
+			const auto sourceRoot = sourcePath.find("menyooStuff/Spooner/");
+			if (sourceRoot != std::string::npos) sourcePath = sourcePath.substr(sourceRoot);
+			const auto sourceMap = Http::Pattern::Sources().Begin(fileName, sourcePath);
+			size_t sourcePlacement = 0;
 
 			for (auto nodeEntity = nodeRoot.child("Placement"); nodeEntity; nodeEntity = nodeEntity.next_sibling("Placement"))
 			{
 				const auto& e = SpawnEntityFromXmlNode(nodeEntity, vModelHashes);
+				if (e.e.handle.Exists()) Http::Pattern::Sources().Register(e.e.handle.GetHandle(), e.e.handle.Model().hash, sourceMap, sourcePlacement);
+				++sourcePlacement;
 				newDb.push_back(e);
 			}
 
@@ -2344,6 +2353,7 @@ namespace sub::Spooner
 
 			Menu::SetSub_closed();
 
+			Http::Pattern::Sources().Complete(sourceMap);
 			return true;
 		}
 
@@ -2445,6 +2455,4 @@ namespace sub::Spooner
 	}
 
 }
-
-
 

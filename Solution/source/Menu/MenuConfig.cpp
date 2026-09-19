@@ -113,6 +113,7 @@ void MenuConfig::ConfigRead()
 	BindCameraPathStop = ini.GetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
 	sub::Spooner::CameraPaths::SetDefaultEasingIndex(ini.GetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex()));
 	BindBecomePed = ini.GetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
+	BindSpidermanBike = ini.GetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
 	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 	PedLod::SetMultiplier((float)ini.GetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier()));
 
@@ -387,6 +388,7 @@ void MenuConfig::SaveConfig()
 	ini.SetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
 	ini.SetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex());
 	ini.SetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
+	ini.SetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
 	ini.SetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 	ini.SetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier());
 
@@ -652,5 +654,4 @@ void MenuConfig::ConfigResetHaxValues()
 	MenuConfig::ConfigRead();
 
 }
-
 

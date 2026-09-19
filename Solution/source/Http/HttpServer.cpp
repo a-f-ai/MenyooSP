@@ -21,6 +21,8 @@
 #include "PlayerApi.h"
 #include "PlayerCommand.h"
 #include "PlayerInput.h"
+#include "PatternSnapshot.h"
+#include "SpidermanBike.h"
 #include "WorldApi.h"
 
 #include "../Natives/natives2.h"
@@ -528,10 +530,12 @@ namespace Http::Server
 					"POST /world/raycast  {from:{x,y,z}, to:{x,y,z}, include?:[map|vehicles|peds|objects|foliage|everything], ignoreEntity?}",
 					"     the only way to see static map geometry - a building is not an entity and /world/nearby cannot see it",
 					"GET /world/nearby?x=&y=&z=&radius=&type=&limit=  world entities near a point",
+					"POST /world/pattern-snapshot {origin,radius,types,maxEntities,frame,supportProbe,include}; every field required; see PATTERN_CAPTURE_API.md; read-only, no partial success",
 				}) },
 				{ "player", json::array({
 					"POST /player/model  {model} or {alias, variant?}; exact aliases come from Characters.json; multi-variant aliases require an explicit defaultVariant or variant",
 					"POST /player/vehicle  {model|alias, position?:{x,y,z}, heading?} spawns a vehicle and immediately seats the player as driver",
+					"POST /player/spiderman-bike {} exact SpidermanRed + bati2 livery 1; safe adjacent placement, collision on, driver readback; Ctrl+Shift+F6; failures carry stage and actual state",
 					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
 					"POST /player/input  {controls:[{control,value}, ...], holdMilliseconds} holds native GTA input on every game tick; control is 0..337 and value is -1..1",
 					"POST /player/input/release  releases every virtual control immediately",
@@ -582,6 +586,19 @@ namespace Http::Server
 
 		void RegisterRoutes(httplib::Server& server)
 		{
+			server.Post("/player/spiderman-bike", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const auto body = ParseObjectBody(req);
+					if (!body.empty()) throw ApiError(400, "spiderman-bike requires an empty JSON object");
+					return std::function<Response()>([] { return MakeSpidermanOnBike(); });
+				}, 12000ms);
+			});
+			server.Post("/world/pattern-snapshot", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const auto capture = Pattern::Parse(ParseObjectBody(req));
+					return std::function<Response()>([capture] { return Pattern::Capture(capture); });
+				}, 4000ms);
+			});
 			server.Get("/", [](const httplib::Request&, httplib::Response& response) {
 				Write(response, 200, Describe());
 			});

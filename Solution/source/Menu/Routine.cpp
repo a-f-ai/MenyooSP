@@ -17,6 +17,7 @@
 #include "..\Http\HttpServer.h"
 #include "..\Http\GameFiberHeartbeat.h"
 #include "..\Http\PlayerApi.h"
+#include "../Http/SpidermanBike.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
 #include "..\Submenus\Spooner\CharacterPicker.h"
 #include "..\Misc\PedLod.h"
@@ -252,6 +253,18 @@ inline void MenyooMain()
 		if (loop_neon_flash == 2 || loop_neon_flash == 3) TickNeonSpinAnim();
 		if (loop_neon_flash == 4)  TickNeonFwkAnim();
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
+		if (Http::IsSpidermanBikeChord(get_key_pressed(VK_CONTROL), get_key_pressed(VK_SHIFT), get_key_pressed(VK_MENU)) && IsKeyJustUp(BindSpidermanBike))
+		{
+			const auto result = Http::MakeSpidermanOnBike();
+			addlog(result.status == 201 ? ige::LogType::LOG_INFO : ige::LogType::LOG_ERROR, "Spiderman bike: " + result.body);
+			if (result.status == 201) Game::Print::PrintBottomLeft("SpidermanRed + Bati 801RR: driver ready.");
+			if (result.status != 201)
+			{
+				const auto error = nlohmann::json::parse(result.body, nullptr, false);
+				if (error.is_discarded()) Game::Print::PrintBottomLeft("Spiderman bike: invalid error response; see menyooLog.txt");
+				if (!error.is_discarded()) Game::Print::PrintBottomLeft("Spiderman bike [" + error["stage"].get<std::string>() + "]: " + error["error"].get<std::string>());
+			}
+		}
 		if (IsKeyJustUp(BindBecomePed))
 			BecomeSelectedOrAimedPed();
 		if (IsKeyJustUp(BindCameraPath))
@@ -641,6 +654,7 @@ INT16 BindCameraPathAddKey = VirtualKey::OEM6;   // ]
 INT16 BindCameraPathPlay = VirtualKey::OEM4;     // [
 INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
 INT16 BindBecomePed = VirtualKey::F6;
+INT16 BindSpidermanBike = VirtualKey::F6;
 INT16 BindCharacterPicker = VirtualKey::F5;
 
 INT16 bind_no_clip = VirtualKey::F3;

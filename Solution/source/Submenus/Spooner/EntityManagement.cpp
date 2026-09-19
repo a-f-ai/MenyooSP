@@ -8,6 +8,7 @@
 * (at your option) any later version.
 */
 #include "EntityManagement.h"
+#include "../../Http/PatternSnapshot.h"
 
 #include "..\..\macros.h"
 
@@ -188,6 +189,7 @@ namespace sub::Spooner
 			{
 				if (!it->handle.Exists())
 				{
+					Http::Pattern::Sources().Remove(it->handle.GetHandle());
 					//it->handle.Delete(false);
 					it = Databases::EntityDb.erase(it);
 				}
@@ -1023,6 +1025,5 @@ namespace sub::Spooner
 	}
 
 }
-
 
 

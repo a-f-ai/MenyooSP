@@ -2,6 +2,7 @@
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 */
 #include "EntityApi.h"
+#include "../Scripting/enums.h"
 
 #include "ModelApi.h"
 
@@ -239,6 +240,8 @@ namespace Http::EntityApi
 				out.currentScenario = request.scenario;
 				ApplyPedBehaviour(out.handle, request.scenario, request.animDict, request.animName,
 					request.still);
+				if (request.scenario.empty() && !request.animDict.empty() && !request.animName.empty())
+					out.AddOrUpdateLastAnimation({request.animDict, request.animName, 4.0f, -4.0f, 0.0f, -1, AnimFlag::Loop, false});
 			}
 
 			sub::Spooner::EntityManagement::AddEntityToDb(out);
@@ -478,6 +481,7 @@ namespace Http::EntityApi
 			{
 				Game::RequestAnimDict(*request.animDict, 1500);
 				GTAped(entity->handle).Task().PlayAnimation(*request.animDict, *request.animName);
+				entity->AddOrUpdateLastAnimation({*request.animDict, *request.animName, 4.0f, -4.0f, 0.0f, -1, AnimFlag::Loop, false});
 			}
 		}
 

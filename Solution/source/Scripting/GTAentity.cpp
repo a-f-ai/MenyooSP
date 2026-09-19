@@ -19,6 +19,7 @@
 * Copyright (C) 2019  MAFINS
 */
 #include "GTAentity.h"
+#include "../Http/PatternSnapshot.h"
 
 #include "..\macros.h"
 
@@ -855,6 +856,7 @@ bool GTAentity::RequestControl(DWORD timeOut)
 
 void GTAentity::Delete(bool tele)
 {
+	Http::Pattern::Sources().Remove(this->mHandle);
 	if (!this->Exists()) return;
 
 	this->RequestControl();
