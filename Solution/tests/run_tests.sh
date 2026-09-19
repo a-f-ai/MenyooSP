@@ -18,6 +18,9 @@ mkdir -p "$build/Http" "$build/Util" "$build/Submenus/Spooner"
 cp "$source_root/Http/CommandQueue.h" "$source_root/Http/CommandQueue.cpp" "$build/Http/"
 cp "$here/CommandQueueTests.cpp" "$build/Http/"
 
+cp "$source_root/Http/GameFiberHeartbeat.h" "$source_root/Http/GameFiberHeartbeat.cpp" "$build/Http/"
+cp "$here/GameFiberHeartbeatTests.cpp" "$build/Http/"
+
 cp "$source_root/Http/PlayerInput.h" "$build/Http/"
 cp "$here/PlayerInputTests.cpp" "$build/Http/"
 
@@ -52,12 +55,25 @@ compiler="${CXX:-c++}"
 # behaviour, so the noise is turned off rather than chased.
 flags=(-std=c++20 -O1 -w)
 
+echo "--- HTTP routing boundary ---"
+python3 "$here/HttpRoutingTests.py"
+
+echo
+
 echo "--- command queue ---"
 "$compiler" "${flags[@]}" -pthread \
     -I"$build/Http" \
     "$build/Http/CommandQueue.cpp" "$build/Http/CommandQueueTests.cpp" \
     -o "$build/queue_tests"
 "$build/queue_tests"
+
+echo
+echo "--- game fiber heartbeat ---"
+"$compiler" "${flags[@]}" -pthread \
+    -I"$build/Http" \
+    "$build/Http/GameFiberHeartbeat.cpp" "$build/Http/GameFiberHeartbeatTests.cpp" \
+    -o "$build/heartbeat_tests"
+"$build/heartbeat_tests"
 
 echo
 echo "--- player input validation ---"

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <chrono>
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <future>
@@ -26,9 +27,18 @@ namespace Http
 
 	struct Command
 	{
+		enum class State
+		{
+			Pending,
+			Running,
+			Cancelled,
+			Completed,
+		};
+
 		// Runs on the fiber. Must not throw: see ApiError.h.
 		std::function<Response()> run;
 		std::promise<Response> result;
+		std::atomic<State> state{ State::Pending };
 	};
 
 	class CommandQueue
@@ -52,6 +62,7 @@ namespace Http
 		void Stop();
 		bool IsRunning() const;
 		size_t Depth() const;
+		size_t RunningCount() const;
 
 	private:
 		mutable std::mutex m_mutex;
@@ -63,6 +74,7 @@ namespace Http
 		// loop and calls Drain again. Without this the nested call would steal
 		// the queue out from under the command that is still running.
 		bool m_draining;
+		std::atomic<size_t> m_runningCount{ 0 };
 	};
 
 	CommandQueue& Queue();

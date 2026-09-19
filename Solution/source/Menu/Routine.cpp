@@ -15,6 +15,7 @@
 #include "MenuConfig.h"
 #include "../Submenus/Spooner/ImGuiSpooner.h"
 #include "..\Http\HttpServer.h"
+#include "..\Http\GameFiberHeartbeat.h"
 #include "..\Http\PlayerApi.h"
 #include "..\Submenus\Spooner\CameraPathPlayer.h"
 #include "..\Submenus\Spooner\CharacterPicker.h"
@@ -222,20 +223,27 @@ inline void MenyooMain()
 	}
 
 	addlog(ige::LogType::LOG_TRACE, "Creating Tick loop");
+	uint64_t heartbeatFrame = 0;
 	for (;;)
 	{
+		++heartbeatFrame;
+		Http::Heartbeat().Mark("frame-start", heartbeatFrame);
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Textures");
 		DxHookIMG::DxTexture::GlobalDrawOrderRef() = -9999;
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Tick");
+		Http::Heartbeat().Mark("menu", heartbeatFrame);
 		Menu::Tick();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Load MenyooConfig");
+		Http::Heartbeat().Mark("config", heartbeatFrame);
 		TickMenyooConfig();
+		Http::Heartbeat().Mark("spooner-autosave", heartbeatFrame);
 		TickSpoonerAutoSave();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Neonanims");
+		Http::Heartbeat().Mark("effects-and-hotkeys", heartbeatFrame);
 		if (loop_neon_rgb || carColorChange) TickRainbowFader();
 		if (loop_neon_fade == 1)   TickNeonFadeAnim();
 		if (loop_neon_fade == 2)   TickNeonHeartbeatAnim();
@@ -288,11 +296,17 @@ inline void MenyooMain()
 				sub::Spooner::CameraPaths::State().requestStop = true;
 			}
 		}
+		Http::Heartbeat().Mark("ped-lod", heartbeatFrame);
 		PedLod::Tick();
+		Http::Heartbeat().Mark("character-picker", heartbeatFrame);
 		sub::Spooner::CharacterPicker::Tick();
+		Http::Heartbeat().Mark("camera-paths", heartbeatFrame);
 		sub::Spooner::CameraPaths::Tick();
+		Http::Heartbeat().Mark("http-commands", heartbeatFrame);
 		Http::Server::DrainCommands();
+		Http::Heartbeat().Mark("player-controls", heartbeatFrame);
 		Http::PlayerApi::TickControls();
+		Http::Heartbeat().Mark("frame-complete", heartbeatFrame);
 		WAIT(0);
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - looping");

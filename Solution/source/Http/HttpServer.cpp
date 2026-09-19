@@ -14,6 +14,7 @@
 #include "CatalogApi.h"
 #include "CommandQueue.h"
 #include "EntityApi.h"
+#include "GameFiberHeartbeat.h"
 #include "Json.h"
 #include "MapApi.h"
 #include "ModelApi.h"
@@ -474,6 +475,24 @@ namespace Http::Server
 			}
 		}
 
+		void direct(httplib::Response& response, const std::function<Response()>& work)
+		{
+			try
+			{
+				const Response result = work();
+				response.status = result.status;
+				response.set_content(result.body, "application/json");
+			}
+			catch (const ApiError& error)
+			{
+				Write(response, error.Status(), json{ { "error", error.what() } });
+			}
+			catch (const std::exception& error)
+			{
+				Write(response, 500, json{ { "error", std::string("unhandled exception: ") + error.what() } });
+			}
+		}
+
 		json Describe()
 		{
 			return json{
@@ -568,9 +587,16 @@ namespace Http::Server
 			});
 
 			server.Get("/health", [](const httplib::Request&, httplib::Response& response) {
-				Write(response, 200, json{
-					{ "ok", Queue().IsRunning() },
+				const auto snapshot = Heartbeat().Snapshot(2000ms);
+				Write(response, snapshot.stalled ? 503 : 200, json{
+					{ "ok", Queue().IsRunning() && snapshot.started && !snapshot.stalled },
+					{ "fiberStarted", snapshot.started },
+					{ "fiberStalled", snapshot.stalled },
+					{ "stage", snapshot.stage },
+					{ "frame", snapshot.frame },
+					{ "heartbeatAgeMs", snapshot.ageMilliseconds },
 					{ "queueDepth", Queue().Depth() },
+					{ "runningCommands", Queue().RunningCount() },
 				});
 			});
 
@@ -905,10 +931,8 @@ namespace Http::Server
 
 			// ---- maps ----
 
-			server.Get("/maps", [](const httplib::Request& request, httplib::Response& response) {
-				Handle(request, response, [](const httplib::Request&) {
-					return std::function<Response()>([] { return MapApi::ListMaps(); });
-				});
+			server.Get("/maps", [](const httplib::Request&, httplib::Response& response) {
+				direct(response, [] { return MapApi::ListMaps(); });
 			});
 
 			server.Post("/maps/save", [](const httplib::Request& request, httplib::Response& response) {
@@ -947,43 +971,26 @@ namespace Http::Server
 			// These touch only mutex-guarded state, never a native, so they
 			// answer on this thread instead of waiting for a frame.
 
-			const auto direct = [](httplib::Response& response, const std::function<Response()>& work) {
-				try
-				{
-					const Response result = work();
-					response.status = result.status;
-					response.set_content(result.body, "application/json");
-				}
-				catch (const ApiError& error)
-				{
-					Write(response, error.Status(), json{ { "error", error.what() } });
-				}
-				catch (const std::exception& error)
-				{
-					Write(response, 500, json{ { "error", std::string("unhandled exception: ") + error.what() } });
-				}
-			};
-
-			server.Get("/camera/path", [direct](const httplib::Request&, httplib::Response& response) {
+			server.Get("/camera/path", [](const httplib::Request&, httplib::Response& response) {
 				direct(response, [] { return CameraApi::GetPath(); });
 			});
 
-			server.Put("/camera/path", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Put("/camera/path", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] { return CameraApi::ReplacePath(ParseObjectBody(request)); });
 			});
 
-			server.Post("/camera/keys", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Post("/camera/keys", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] {
 					const json body = request.body.empty() ? json::object() : ParseObjectBody(request);
 					return CameraApi::AppendKey(body);
 				});
 			});
 
-			server.Delete(R"(/camera/keys/(\d+))", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Delete(R"(/camera/keys/(\d+))", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] { return CameraApi::DeleteKey(ParseId(request.matches[1])); });
 			});
 
-			server.Post(R"(/camera/(play|pause|stop|seek))", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Post(R"(/camera/(play|pause|stop|seek))", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] {
 					const std::string action = request.matches[1];
 					float time = 0.0f;
@@ -996,21 +1003,21 @@ namespace Http::Server
 				});
 			});
 
-			server.Post("/camera/look", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Post("/camera/look", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] { return CameraApi::Look(ParseObjectBody(request)); });
 			});
 
-			server.Get("/camera/paths", [direct](const httplib::Request&, httplib::Response& response) {
+			server.Get("/camera/paths", [](const httplib::Request&, httplib::Response& response) {
 				direct(response, [] { return CameraApi::ListSaved(); });
 			});
 
-			server.Post("/camera/paths/save", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Post("/camera/paths/save", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] {
 					return CameraApi::SavePath(Field(ParseObjectBody(request), "name").get<std::string>());
 				});
 			});
 
-			server.Post("/camera/paths/load", [direct](const httplib::Request& request, httplib::Response& response) {
+			server.Post("/camera/paths/load", [](const httplib::Request& request, httplib::Response& response) {
 				direct(response, [&request] {
 					return CameraApi::LoadPath(Field(ParseObjectBody(request), "name").get<std::string>());
 				});

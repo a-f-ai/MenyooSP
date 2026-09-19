@@ -5,6 +5,7 @@
 
 #include "../Util/FileLogger.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -43,11 +44,21 @@ namespace Http
 
 		if (pending.wait_for(timeout) != std::future_status::ready)
 		{
-			// The fiber is blocked (map load, RequestAnimDict, a pause menu) or
-			// ScriptHookV has stopped ticking it. Say so instead of holding the
-			// connection open.
+			{
+				std::lock_guard<std::mutex> lock(m_mutex);
+				if (command->state == Command::State::Pending)
+				{
+					auto queued = std::find(m_pending.begin(), m_pending.end(), command);
+					if (queued != m_pending.end())
+						m_pending.erase(queued);
+					command->state = Command::State::Cancelled;
+					addlog(ige::LogType::LOG_WARNING, "HTTP command timed out before the game thread started it");
+					return Response{ 503, R"({"error":"game thread did not respond before the pending command timeout","commandState":"cancelled"})" };
+				}
+			}
+
 			addlog(ige::LogType::LOG_WARNING, "HTTP command timed out waiting for the game thread");
-			return Response{ 503, R"({"error":"game thread did not respond within the timeout"})" };
+			return Response{ 503, R"({"error":"game thread command is still running after the timeout","commandState":"running"})" };
 		}
 
 		return pending.get();
@@ -62,6 +73,11 @@ namespace Http
 				return; // re-entered from a command that yielded the fiber
 			m_draining = true;
 			batch.swap(m_pending);
+			for (auto& command : batch)
+			{
+				command->state = Command::State::Running;
+				++m_runningCount;
+			}
 		}
 
 		// Commands are written not to throw: an exception on this fiber kills
@@ -75,6 +91,8 @@ namespace Http
 			try
 			{
 				command->result.set_value(command->run());
+				command->state = Command::State::Completed;
+				--m_runningCount;
 			}
 			catch (const std::exception& error)
 			{
@@ -103,6 +121,7 @@ namespace Http
 		// Release anyone still waiting rather than letting them hit the timeout.
 		for (auto& command : batch)
 		{
+			command->state = Command::State::Cancelled;
 			command->result.set_value(Response{ 503, R"({"error":"plugin is shutting down"})" });
 		}
 	}
@@ -117,6 +136,11 @@ namespace Http
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 		return m_pending.size();
+	}
+
+	size_t CommandQueue::RunningCount() const
+	{
+		return m_runningCount.load();
 	}
 
 	CommandQueue& Queue()

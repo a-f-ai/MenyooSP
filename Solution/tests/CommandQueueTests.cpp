@@ -100,9 +100,11 @@ namespace
 	{
 		std::printf("a blocked game thread times out instead of hanging\n");
 		Http::CommandQueue queue(64, 150ms);
+		bool ranAfterTimeout = false;
 
 		const auto started = std::chrono::steady_clock::now();
-		const Http::Response result = queue.Submit([]() -> Http::Response {
+		const Http::Response result = queue.Submit([&]() -> Http::Response {
+			ranAfterTimeout = true;
 			return Ok("never reached");
 		});
 		const auto elapsed = std::chrono::steady_clock::now() - started;
@@ -112,6 +114,41 @@ namespace
 			"the 503 explains that the game thread is unresponsive");
 		Check(elapsed >= 150ms, "the caller waited for the timeout");
 		Check(elapsed < 2s, "the caller was not left hanging");
+		Check(queue.Depth() == 0, "a timed-out pending command is removed from the queue");
+
+		queue.Drain();
+		Check(!ranAfterTimeout, "a timed-out pending command cannot execute later");
+	}
+
+	void ARunningCommandIsReportedSeparatelyFromACancelledPendingCommand()
+	{
+		std::printf("a running command is not mislabeled as cancelled\n");
+		Http::CommandQueue queue(64, 50ms);
+		std::atomic<bool> entered{ false };
+		Http::Response result{};
+
+		std::thread submitter([&] {
+			result = queue.Submit([&]() -> Http::Response {
+				entered = true;
+				std::this_thread::sleep_for(150ms);
+				return Ok("finished");
+			});
+		});
+
+		while (queue.Depth() == 0)
+			std::this_thread::yield();
+		std::thread drainer([&] { queue.Drain(); });
+		while (!entered)
+			std::this_thread::yield();
+
+		submitter.join();
+		Check(result.status == 503, "a running command still returns a timeout response");
+		Check(result.body.find("still running") != std::string::npos,
+			"the timeout identifies that execution already started");
+		Check(queue.RunningCount() == 1, "health state exposes the running command");
+
+		drainer.join();
+		Check(queue.RunningCount() == 0, "completed work leaves the running set");
 	}
 
 	void AFullQueueIsRejected()
@@ -208,6 +245,7 @@ int main()
 	SubmittedWorkRunsOnTheDrainingThread();
 	FailureStatusesTravelBackAsValues();
 	ABlockedGameThreadTimesOut();
+	ARunningCommandIsReportedSeparatelyFromACancelledPendingCommand();
 	AFullQueueIsRejected();
 	StopReleasesWaitingCallers();
 	ConcurrentSubmittersEachGetTheirOwnResult();
