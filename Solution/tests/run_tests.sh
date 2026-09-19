@@ -21,6 +21,10 @@ cp "$here/CommandQueueTests.cpp" "$build/Http/"
 cp "$source_root/Http/PlayerInput.h" "$build/Http/"
 cp "$here/PlayerInputTests.cpp" "$build/Http/"
 
+cp "$source_root/Http/PlayerCommand.h" "$source_root/Http/PlayerCommand.cpp" \
+   "$source_root/Http/ApiError.h" "$source_root/Http/Json.h" "$build/Http/"
+cp "$here/PlayerCommandTests.cpp" "$build/Http/"
+
 cp "$source_root/Submenus/Spooner/CameraPath.h" \
    "$source_root/Submenus/Spooner/CameraPath.cpp" "$build/Submenus/Spooner/"
 cp "$here/CameraPathTests.cpp" "$build/Submenus/Spooner/"
@@ -62,6 +66,14 @@ echo "--- player input validation ---"
     "$build/Http/PlayerInputTests.cpp" \
     -o "$build/player_input_tests"
 "$build/player_input_tests"
+
+echo
+echo "--- player command HTTP boundary ---"
+"$compiler" "${flags[@]}" \
+    -I"$build/Http" -I"$source_root/../external" \
+    "$build/Http/PlayerCommand.cpp" "$build/Http/PlayerCommandTests.cpp" \
+    -o "$build/player_command_tests"
+"$build/player_command_tests"
 
 echo
 echo "--- map name repair ---"

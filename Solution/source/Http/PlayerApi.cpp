@@ -8,9 +8,12 @@
 #include "../Natives/natives2.h"
 #include "../Scripting/GTAped.h"
 #include "../Scripting/GTAvehicle.h"
+#include "../Scripting/Model.h"
 #include "../Scripting/Tasks.h"
 #include "../Scripting/enums.h"
+#include "../Submenus/PedModelChanger.h"
 #include "../Submenus/VehicleOptions.h"
+#include "../Util/StringManip.h"
 
 #include <json/single_include/nlohmann/json.hpp>
 
@@ -70,6 +73,106 @@ namespace Http::PlayerApi
 			{ "vehicleId", request.vehicleId },
 			{ "seat", "driver" },
 		});
+	}
+
+	Response SetModel(const SetModelRequest& request)
+	{
+		if (NETWORK_IS_IN_SESSION())
+			return Fail(409, "player model changes through this endpoint are single-player only");
+
+		GTAped player = Player();
+		if (!player.Exists())
+			return Fail(503, "the player ped does not exist yet; the game may still be loading");
+
+		const GTAmodel::Model model(request.model);
+		if (!model.IsInCdImage())
+			return Fail(422, "the requested player model is not installed in the game files");
+		if (!model.IsPed())
+			return Fail(422, "the requested player model is installed but is not a ped");
+		if (!model.Load(4000))
+			return Fail(503, "the requested player model did not stream in within 4000 ms");
+
+		if (player.Model().hash == request.model)
+		{
+			model.Unload();
+			json payload{
+				{ "status", "unchanged" },
+				{ "model", request.modelLabel },
+				{ "hash", IntToHexString(request.model, true) },
+			};
+			if (!request.alias.empty())
+				payload["alias"] = request.alias;
+			return Serialise(200, payload);
+		}
+
+		sub::ChangeModel(model);
+		player = Player();
+		if (!player.Exists() || player.Model().hash != request.model)
+			return Fail(500, "Menyoo completed the model change but the player model did not match the request");
+
+		json payload{
+			{ "status", "changed" },
+			{ "playerId", player.GetHandle() },
+			{ "model", request.modelLabel },
+			{ "hash", IntToHexString(request.model, true) },
+		};
+		if (!request.alias.empty())
+		{
+			payload["alias"] = request.alias;
+			payload["variant"] = request.variant;
+		}
+		return Serialise(200, payload);
+	}
+
+	Response SpawnVehicleAndSeat(const SpawnVehicleRequest& request)
+	{
+		if (NETWORK_IS_IN_SESSION())
+			return Fail(409, "vehicle spawning through this endpoint is single-player only");
+
+		GTAped player = Player();
+		if (!player.Exists())
+			return Fail(503, "the player ped does not exist yet; the game may still be loading");
+
+		const GTAmodel::Model model(request.model);
+		if (!model.IsInCdImage())
+			return Fail(422, "the requested vehicle model is not installed in the game files");
+		if (!model.IsVehicle())
+			return Fail(422, "the requested vehicle model is installed but is not a vehicle");
+		if (!model.Load(4000))
+			return Fail(503, "the requested vehicle model did not stream in within 4000 ms");
+
+		const Vector3 playerPosition = player.GetPosition();
+		const float x = request.hasPosition ? request.x : playerPosition.x;
+		const float y = request.hasPosition ? request.y : playerPosition.y;
+		const float z = request.hasPosition ? request.z : playerPosition.z;
+		const float heading = request.hasHeading ? request.heading : player.GetHeading();
+
+		Vehicle handle = CREATE_VEHICLE(request.model, x, y, z, heading, true, true, false);
+		model.Unload();
+		GTAvehicle vehicle(handle);
+		if (!vehicle.Exists())
+			return Fail(500, "CREATE_VEHICLE did not produce a live vehicle");
+
+		player.SetIntoVehicle(vehicle, SEAT_DRIVER);
+		if (!player.CurrentVehicle().Exists() || player.CurrentVehicle().GetHandle() != handle)
+		{
+			DELETE_VEHICLE(&handle);
+			return Fail(500, "the vehicle was created but the player could not be placed in the driver seat; the vehicle was removed");
+		}
+
+		SET_VEHICLE_IS_STOLEN(handle, false);
+		json payload{
+			{ "status", "seated" },
+			{ "vehicleId", handle },
+			{ "seat", "driver" },
+			{ "model", request.modelLabel },
+			{ "hash", IntToHexString(request.model, true) },
+			{ "position", { { "x", x }, { "y", y }, { "z", z } } },
+			{ "heading", heading },
+		};
+		if (!request.alias.empty())
+			payload["alias"] = request.alias;
+		return Serialise(201, payload);
 	}
 
 	Response Teleport(const TeleportRequest& request)

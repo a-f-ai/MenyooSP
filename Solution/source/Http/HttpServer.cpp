@@ -18,18 +18,22 @@
 #include "MapApi.h"
 #include "ModelApi.h"
 #include "PlayerApi.h"
+#include "PlayerCommand.h"
 #include "PlayerInput.h"
 #include "WorldApi.h"
 
 #include "../Natives/natives2.h"
 #include "../Scripting/Raycast.h"
+#include "../Util/ExePath.h"
 #include "../Util/FileLogger.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -143,6 +147,43 @@ namespace Http::Server
 
 			label = value.get<std::string>();
 			return ResolveModel(label, "field \"model\"");
+		}
+
+		json ReadJsonFile(const std::string& name)
+		{
+			const std::string path = GetPathffA(Pathff::Main, true) + name;
+			std::ifstream file(path, std::ios::binary);
+			if (!file)
+				throw ApiError(500, "cannot open " + path);
+
+			std::stringstream contents;
+			contents << file.rdbuf();
+			const json document = json::parse(contents.str(), nullptr, false);
+			if (document.is_discarded())
+				throw ApiError(500, path + " is not valid JSON");
+			return document;
+		}
+
+		struct ResolvedPlayerModel
+		{
+			unsigned long hash;
+			std::string label;
+			std::string alias;
+			std::string variant;
+		};
+
+		ResolvedPlayerModel ResolvePlayerModel(const json& body, bool character)
+		{
+			const PlayerCommand::ModelInput input = PlayerCommand::ParseModelInput(body);
+			if (input.hasNumericModel)
+				return ResolvedPlayerModel{ input.numericModel, std::to_string(input.numericModel), "", "" };
+			if (!input.model.empty())
+				return ResolvedPlayerModel{ ResolveModel(input.model, "field \"model\""), input.model, "", "" };
+
+			const PlayerCommand::ResolvedAlias resolved = character
+				? PlayerCommand::ResolveCharacterAlias(ReadJsonFile("Characters.json"), input)
+				: PlayerCommand::ResolveVehicleAlias(ReadJsonFile("VehicleShortlist.json"), input);
+			return ResolvedPlayerModel{ resolved.hash, resolved.model, resolved.alias, resolved.variant };
 		}
 
 		std::vector<ModelApi::ModelRef> ParseModelList(const httplib::Request& request)
@@ -437,7 +478,7 @@ namespace Http::Server
 		{
 			return json{
 				{ "service", "menyoo-entity-bridge" },
-				{ "version", 2 },
+				{ "version", 3 },
 				{ "coordinates", "GTA V world space in metres; rotation in degrees, pitch=X roll=Y yaw=Z" },
 				{ "identity", "an entity id is its live script handle, valid only while the entity exists. "
 							  "Give entities a name and address them by name prefix to survive a restart" },
@@ -470,6 +511,8 @@ namespace Http::Server
 					"GET /world/nearby?x=&y=&z=&radius=&type=&limit=  world entities near a point",
 				}) },
 				{ "player", json::array({
+					"POST /player/model  {model} or {alias, variant?}; exact aliases come from Characters.json; multi-variant aliases require an explicit defaultVariant or variant",
+					"POST /player/vehicle  {model|alias, position?:{x,y,z}, heading?} spawns a vehicle and immediately seats the player as driver",
 					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
 					"POST /player/input  {controls:[{control,value}, ...], holdMilliseconds} holds native GTA input on every game tick; control is 0..337 and value is -1..1",
 					"POST /player/input/release  releases every virtual control immediately",
@@ -729,6 +772,31 @@ namespace Http::Server
 			});
 
 			// ---- player ----
+
+			server.Post("/player/model", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const json body = ParseObjectBody(req);
+					const ResolvedPlayerModel model = ResolvePlayerModel(body, true);
+					const PlayerApi::SetModelRequest command{
+						model.hash, model.label, model.alias, model.variant,
+					};
+					return std::function<Response()>([command] { return PlayerApi::SetModel(command); });
+				}, 10000ms);
+			});
+
+			server.Post("/player/vehicle", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const json body = ParseObjectBody(req);
+					const ResolvedPlayerModel model = ResolvePlayerModel(body, false);
+					const PlayerCommand::VehiclePlacement placement = PlayerCommand::ParseVehiclePlacement(body);
+					const PlayerApi::SpawnVehicleRequest command{
+						model.hash, model.label, model.alias,
+						placement.hasPosition, placement.x, placement.y, placement.z,
+						placement.hasHeading, placement.heading,
+					};
+					return std::function<Response()>([command] { return PlayerApi::SpawnVehicleAndSeat(command); });
+				}, 10000ms);
+			});
 
 			server.Post("/player/enter-vehicle", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request& req) {
