@@ -114,6 +114,12 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::CameraPaths::SetDefaultEasingIndex(ini.GetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex()));
 	BindBecomePed = ini.GetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
 	BindSpidermanBike = ini.GetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
+	if (BindSpidermanBike == 117)
+	{
+		BindSpidermanBike = 79;
+		ini.SetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
+		addlog(ige::LogType::LOG_INFO, "Migrated SpidermanBikeButton from conflicting F6 to Ctrl+Shift+O (79)");
+	}
 	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
 	PedLod::SetMultiplier((float)ini.GetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier()));
 
@@ -203,6 +209,7 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::Settings::bAddToDbAsMissionEntities = ini.GetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
 	sub::Spooner::Settings::bClearDbBeforeLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
+	sub::Spooner::Settings::bExtraSunnyAfterMapLoad = ini.GetBoolValue(section_spooner.c_str(), "ExtraSunnyAfterMapLoad", sub::Spooner::Settings::bExtraSunnyAfterMapLoad);
 	sub::Spooner::Settings::bKeepPositionWhenAttaching = ini.GetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	sub::Spooner::Settings::spoonerModeMode = (sub::Spooner::eSpoonerModeMode)ini.GetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
 	sub::Spooner::Settings::bAutoSaveDb = ini.GetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);
@@ -478,6 +485,7 @@ void MenuConfig::SaveConfig()
 	ini.SetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	ini.SetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
 	ini.SetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
+	ini.SetBoolValue(section_spooner.c_str(), "ExtraSunnyAfterMapLoad", sub::Spooner::Settings::bExtraSunnyAfterMapLoad);
 	ini.SetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	ini.SetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
 	ini.SetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);
@@ -654,4 +662,3 @@ void MenuConfig::ConfigResetHaxValues()
 	MenuConfig::ConfigRead();
 
 }
-

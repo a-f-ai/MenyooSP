@@ -115,7 +115,7 @@ namespace Http::MapApi
 			return Fail(404, "no map named \"" + name + "\" in " + GetPathffA(Pathff::Spooner, true));
 
 		if (!sub::Spooner::FileManagement::LoadPlacementsFromFile(path))
-			return Fail(422, "the map failed to load; the XML may be malformed");
+			return Fail(422, "map loading or its completion step failed; see menyooLog.txt for the exact reason; placements may already exist");
 
 		return Ok(json{
 			{ "loaded", name },

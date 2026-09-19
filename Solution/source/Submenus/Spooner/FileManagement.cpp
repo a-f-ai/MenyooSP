@@ -2354,6 +2354,19 @@ namespace sub::Spooner
 			Menu::SetSub_closed();
 
 			Http::Pattern::Sources().Complete(sourceMap);
+			if (Settings::bExtraSunnyAfterMapLoad)
+			{
+				CLEAR_OVERRIDE_WEATHER();
+				CLEAR_WEATHER_TYPE_PERSIST();
+				SET_WEATHER_TYPE_NOW("EXTRASUNNY");
+				if (GET_PREV_WEATHER_TYPE_HASH_NAME() != GET_HASH_KEY("EXTRASUNNY"))
+				{
+					addlog(ige::LogType::LOG_ERROR, "Map placements loaded, but EXTRASUNNY weather readback failed: " + filePath);
+					Game::Print::PrintBottomLeft("Map loaded, but EXTRASUNNY weather could not be applied. See menyooLog.txt.");
+					return false;
+				}
+				addlog(ige::LogType::LOG_INFO, "Map load completion: EXTRASUNNY applied once: " + filePath);
+			}
 			return true;
 		}
 
@@ -2455,4 +2468,3 @@ namespace sub::Spooner
 	}
 
 }
-

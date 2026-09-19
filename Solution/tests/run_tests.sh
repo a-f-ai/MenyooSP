@@ -58,6 +58,10 @@ flags=(-std=c++20 -O1 -w)
 echo "--- HTTP routing boundary ---"
 python3 "$here/HttpRoutingTests.py"
 
+echo "--- keyboard chord event sequence ---"
+"$compiler" "${flags[@]}" -I"$source_root/Util" "$here/KeyboardChordTests.cpp" -o "$build/chord_tests"
+"$build/chord_tests"
+
 echo "--- pattern snapshot ---"
 "$compiler" "${flags[@]}" -pthread -I"$source_root/Http" -I"$source_root/../external" \
     "$source_root/Http/PatternSnapshot.cpp" "$here/PatternSnapshotTests.cpp" -o "$build/pattern_tests"

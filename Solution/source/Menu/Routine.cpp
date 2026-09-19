@@ -253,8 +253,10 @@ inline void MenyooMain()
 		if (loop_neon_flash == 2 || loop_neon_flash == 3) TickNeonSpinAnim();
 		if (loop_neon_flash == 4)  TickNeonFwkAnim();
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
-		if (Http::IsSpidermanBikeChord(get_key_pressed(VK_CONTROL), get_key_pressed(VK_SHIFT), get_key_pressed(VK_MENU)) && IsKeyJustUp(BindSpidermanBike))
+		const bool bikeHotkey = ConsumeSpidermanBikeHotkey();
+		if (bikeHotkey)
 		{
+			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey dispatched; latched chord consumed");
 			const auto result = Http::MakeSpidermanOnBike();
 			addlog(result.status == 201 ? ige::LogType::LOG_INFO : ige::LogType::LOG_ERROR, "Spiderman bike: " + result.body);
 			if (result.status == 201) Game::Print::PrintBottomLeft("SpidermanRed + Bati 801RR: driver ready.");
@@ -265,7 +267,7 @@ inline void MenyooMain()
 				if (!error.is_discarded()) Game::Print::PrintBottomLeft("Spiderman bike [" + error["stage"].get<std::string>() + "]: " + error["error"].get<std::string>());
 			}
 		}
-		if (IsKeyJustUp(BindBecomePed))
+		if (!bikeHotkey && IsKeyJustUp(BindBecomePed))
 			BecomeSelectedOrAimedPed();
 		if (IsKeyJustUp(BindCameraPath))
 			sub::Spooner::CameraPaths::ToggleWindow();
@@ -654,7 +656,7 @@ INT16 BindCameraPathAddKey = VirtualKey::OEM6;   // ]
 INT16 BindCameraPathPlay = VirtualKey::OEM4;     // [
 INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
 INT16 BindBecomePed = VirtualKey::F6;
-INT16 BindSpidermanBike = VirtualKey::F6;
+INT16 BindSpidermanBike = VirtualKey::O;
 INT16 BindCharacterPicker = VirtualKey::F5;
 
 INT16 bind_no_clip = VirtualKey::F3;

@@ -9,6 +9,10 @@ http://dev-c.com
 * Copyright (C) 2019  MAFINS
 */
 #include "keyboard.h"
+#include "KeyboardChord.h"
+#include "FileLogger.h"
+#include "../Menu/Routine.h"
+#include <mutex>
 
 #include <Windows.h>
 
@@ -30,18 +34,40 @@ struct {
 	BOOL isUpNow;
 } keyStates[KEYS_SIZE];
 
+namespace
+{
+	KeyboardChord bikeChord;
+	std::mutex bikeChordMutex;
+}
+
 
 void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, BOOL isWithAlt, BOOL wasDownBefore, BOOL isUpNow)
 {
-	if (key < KEYS_SIZE)
 	{
-		keyStates[key].time = GetTickCount();
-		keyStates[key].isWithAlt = isWithAlt;
-		keyStates[key].wasDownBefore = wasDownBefore;
-		keyStates[key].isUpNow = isUpNow;
+		std::lock_guard<std::mutex> lock(bikeChordMutex);
+		if (key < KEYS_SIZE)
+		{
+			keyStates[key].time = GetTickCount();
+			keyStates[key].isWithAlt = isWithAlt;
+			keyStates[key].wasDownBefore = wasDownBefore;
+			keyStates[key].isUpNow = isUpNow;
+		}
+		const bool armed = bikeChord.Armed();
+		bikeChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindSpidermanBike);
+		if (key == BindSpidermanBike)
+			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey event: key=" + std::to_string(key) +
+				" up=" + std::to_string(isUpNow != 0) + " ctrl=" + std::to_string(bikeChord.Control()) +
+				" shift=" + std::to_string(bikeChord.Shift()) + " alt=" + std::to_string(bikeChord.Alt()) +
+				" armedBefore=" + std::to_string(armed) + " armedAfter=" + std::to_string(bikeChord.Armed()));
 	}
 }
 
+
+bool ConsumeSpidermanBikeHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return bikeChord.Consume([] { ResetKeyState(BindSpidermanBike); });
+}
 
 bool IsKeyDown(DWORD key)
 {
@@ -125,5 +151,3 @@ std::string VkCodeToStr(UINT8 key)
 	case VirtualKey::Space:  return ("Space"); break;
 	}
 }
-
-
