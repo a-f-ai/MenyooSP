@@ -8,7 +8,7 @@ namespace Http
     struct SpidermanBikeRuntime
     {
         virtual ~SpidermanBikeRuntime()=default;
-        virtual BikeStep Preflight()=0;
+        virtual BikeStep Prepare()=0;
         virtual BikeStep LeaveVehicle()=0;
         virtual BikeStep ChangeModel()=0;
         virtual BikeStep EnableCollision()=0;

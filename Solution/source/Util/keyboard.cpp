@@ -53,6 +53,9 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 			keyStates[key].isUpNow = isUpNow;
 		}
 		const bool armed = bikeChord.Armed();
+		if (key == VirtualKey::F8 || key == menuToggleKey)
+			addlog(ige::LogType::LOG_INFO, "Menu key event: key=" + std::to_string(key) +
+				" up=" + std::to_string(isUpNow != 0) + " repeat=" + std::to_string(wasDownBefore != 0));
 		bikeChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindSpidermanBike);
 		if (key == BindSpidermanBike)
 			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey event: key=" + std::to_string(key) +

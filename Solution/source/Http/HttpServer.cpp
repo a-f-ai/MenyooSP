@@ -535,7 +535,7 @@ namespace Http::Server
 				{ "player", json::array({
 					"POST /player/model  {model} or {alias, variant?}; exact aliases come from Characters.json; multi-variant aliases require an explicit defaultVariant or variant",
 					"POST /player/vehicle  {model|alias, position?:{x,y,z}, heading?} spawns a vehicle and immediately seats the player as driver",
-					"POST /player/spiderman-bike {} exact SpidermanRed + bati2 livery 1; safe adjacent placement, collision on, driver readback; Ctrl+Shift+O (latched v2); failures carry stage and actual state",
+                    "POST /player/spiderman-bike {} exact SpidermanRed + bati2 livery 1; fixed 2m right offset, no geometry preflight, collision on, driver readback; Ctrl+Shift+O (latched v2); failures carry stage and actual state",
 					"POST /player/enter-vehicle  {vehicleId} starts the normal walk-and-enter animation for the driver seat",
 					"POST /player/input  {controls:[{control,value}, ...], holdMilliseconds} holds native GTA input on every game tick; control is 0..337 and value is -1..1",
 					"POST /player/input/release  releases every virtual control immediately",

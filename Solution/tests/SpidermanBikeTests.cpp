@@ -9,7 +9,7 @@ struct Game : SpidermanBikeRuntime
     std::string model="original";
     int bike=0,livery=-1,vehicle=0;
     explicit Game(bool seated):inOldVehicle(seated) { if(seated) vehicle=8; }
-    BikeStep Preflight() override { return fail=="preflight"?BikeStep{422,"missing model"}:BikeStep{200,""}; }
+    BikeStep Prepare() override { return fail=="prepare"?BikeStep{422,"missing model"}:BikeStep{200,""}; }
     BikeStep LeaveVehicle() override { if(fail=="leave-vehicle") return {409,"exit blocked"}; inOldVehicle=false;vehicle=0;return {200,""}; }
     BikeStep ChangeModel() override { if(inOldVehicle) return {500,"still in vehicle"}; if(fail=="change-model") return {500,"model failed"}; model="SpidermanRed";return {200,""}; }
     BikeStep EnableCollision() override { if(fail=="collision") return {500,"collision failed"};collision=true;return {200,""}; }
@@ -28,12 +28,12 @@ int main()
         auto result=RunSpidermanBike(game);auto body=json::parse(result.body);
         check(result.status==201 && body["state"]["model"]=="SpidermanRed" && body["state"]["vehicleId"]==9 && body["state"]["collision"]==true,"full action succeeds on foot and from existing vehicle");
     }
-    for(const auto* stage:{"preflight","leave-vehicle","change-model","collision","spawn-bike","seat","verify"})
+    for(const auto* stage:{"prepare","leave-vehicle","change-model","collision","spawn-bike","seat","verify"})
     {
         Game game(true);game.fail=stage;
         auto result=RunSpidermanBike(game);auto body=json::parse(result.body);
         check(result.status>=400 && body["stage"]==stage && body["state"]==game.Observe() && !body.contains("status"),"failure returns actual state and failing stage, never success");
-        if(game.fail=="preflight") check(game.model=="original" && game.vehicle==8 && game.bike==0,"preflight failure leaves world unchanged");
+        if(game.fail=="prepare") check(game.model=="original" && game.vehicle==8 && game.bike==0,"model preparation failure leaves world unchanged");
         if(game.fail=="collision") check(game.bike==0,"collision failure stops before spawning");
         if(game.fail=="seat") check(game.bike==9 && game.vehicle==0,"seat failure reports retained bike without invented rollback");
     }

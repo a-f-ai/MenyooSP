@@ -13,6 +13,7 @@
 
 #include "..\Util\GTAmath.h"
 #include "..\Util\keyboard.h"
+#include "MenuState.h"
 #include "..\Natives\natives2.h"
 #include "..\Natives\types.h" // RGBA/RgbS
 #include "..\Scripting\Scaleform.h"
@@ -476,6 +477,10 @@ void Menu::optionhi()
 }
 bool Menu::isBinds()
 {
+	if (IsKeyJustUp(menuToggleKey, false))
+		addlog(ige::LogType::LOG_INFO, "Menu toggle observed: key=" + std::to_string(menuToggleKey) +
+			" controller=" + std::to_string(usingControllerInput) + " active=" + std::to_string(activeSubmenu) +
+			" lastOpened=" + std::to_string(lastOpenedSubmenu) + " paused=" + std::to_string(IS_PAUSE_MENU_ACTIVE()));
 	// Open menu - RB + Left / F8
 	UINT8 index1 = menubindsGamepad.first < 50 ? 0 : 2;
 	UINT8 index2 = menubindsGamepad.second < 50 ? 0 : 2;
@@ -498,6 +503,7 @@ void Menu::while_closed()
 		Game::Sound::PlayFrontend("FocusIn", "HintCamSounds");
 
 		activeSubmenu = lastOpenedSubmenu;
+		addlog(ige::LogType::LOG_INFO, "Menu toggle opened: active=" + std::to_string(activeSubmenu));
 		addlog(ige::LogType::LOG_TRACE, "Setting current submenu to lastOpenedSubmenu: " + std::to_string(lastOpenedSubmenu));
 		if (activeSubmenu == SUB::MAINMENU)
 		{
@@ -673,13 +679,13 @@ void Menu::NewSetMenu(INT sub_index)
 
 void Menu::SetSub_closed()
 {
+    if (!CloseMenuState(activeSubmenu, lastOpenedSubmenu, SUB::CLOSED)) return;
+    addlog(ige::LogType::LOG_INFO, "Menu closed: lastOpened=" + std::to_string(lastOpenedSubmenu));
 	//Game::RequestScript("cellphone_controller");
 	ENABLE_ALL_CONTROL_ACTIONS(0);
 	ENABLE_ALL_CONTROL_ACTIONS(2);
 	Game::Sound::PlayFrontend_default("BACK");
 
-	lastOpenedSubmenu = activeSubmenu;
-	activeSubmenu = SUB::CLOSED;
 
 	// if the current sub is stored in Menu::lastOpenedSubmenu, it can be reopened on menuOpen.
 	// This way, the binds can be used in any submenu and that submenu can be reopened instantly
@@ -1749,8 +1755,6 @@ bool AddPresetColourOptions(INT& r, INT& g, INT& b)
 	}
 	return bPressed;
 }
-
-
 
 
 

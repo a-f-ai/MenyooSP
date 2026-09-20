@@ -5,7 +5,7 @@ namespace Http
     {
         using json=nlohmann::json;
         const std::pair<const char*,BikeStep(SpidermanBikeRuntime::*)()> steps[]{
-            {"preflight",&SpidermanBikeRuntime::Preflight},{"leave-vehicle",&SpidermanBikeRuntime::LeaveVehicle},
+            {"prepare",&SpidermanBikeRuntime::Prepare},{"leave-vehicle",&SpidermanBikeRuntime::LeaveVehicle},
             {"change-model",&SpidermanBikeRuntime::ChangeModel},{"collision",&SpidermanBikeRuntime::EnableCollision},
             {"spawn-bike",&SpidermanBikeRuntime::SpawnBike},{"seat",&SpidermanBikeRuntime::SeatPlayer},{"verify",&SpidermanBikeRuntime::Verify}};
         for(const auto& step:steps)
