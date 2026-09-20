@@ -17,6 +17,7 @@ namespace Http::WorldApi
 
 	// Casts down from (x, y, probeZ) and reports the first surface below.
 	Response GetGround(float x, float y, float probeZ);
+	Response GetWater(float x, float y, float probeZ);
 
 	// Where the camera is pointing: the spooner camera when it is up, the
 	// gameplay camera otherwise.

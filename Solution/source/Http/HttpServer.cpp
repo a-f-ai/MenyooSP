@@ -526,6 +526,7 @@ namespace Http::Server
 					"GET /world/player     where the player is, plus the ground height under them",
 					"GET /world/camera     gameplay camera, and the spooner camera when it is on",
 					"GET /world/ground?x=&y=&z=   the surface below a point",
+					"GET /world/water?x=&y=&z=    the no-wave water surface; 422 when no water exists",
 					"GET /world/aim?maxDistance=  what the camera is looking at; \"hit\":false when it is pointed at nothing",
 					"POST /world/raycast  {from:{x,y,z}, to:{x,y,z}, include?:[map|vehicles|peds|objects|foliage|everything], ignoreEntity?}",
 					"     the only way to see static map geometry - a building is not an entity and /world/nearby cannot see it",
@@ -783,6 +784,15 @@ namespace Http::Server
 					const float y = RequiredFloatParam(req, "y");
 					const float z = FloatParam(req, "z", 1000.0f);
 					return std::function<Response()>([x, y, z] { return WorldApi::GetGround(x, y, z); });
+				});
+			});
+
+			server.Get("/world/water", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request& req) {
+					const float x = RequiredFloatParam(req, "x");
+					const float y = RequiredFloatParam(req, "y");
+					const float z = FloatParam(req, "z", 100.0f);
+					return std::function<Response()>([x, y, z] { return WorldApi::GetWater(x, y, z); });
 				});
 			});
 

@@ -221,6 +221,14 @@ namespace Http::WorldApi
 		});
 	}
 
+	Response GetWater(float x, float y, float probeZ)
+	{
+		float waterZ = 0.0f;
+		if (!WATER::GET_WATER_HEIGHT_NO_WAVES(x, y, probeZ, &waterZ))
+			return Fail(422, "no water surface at the requested coordinate");
+		return Ok(json{ { "x", x }, { "y", y }, { "probeZ", probeZ }, { "waterZ", waterZ } });
+	}
+
 	Response Aim(float maxDistance)
 	{
 		auto& spoonerCam = sub::Spooner::SpoonerMode::spoonerModeCamera;
