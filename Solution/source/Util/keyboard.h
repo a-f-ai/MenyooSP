@@ -232,9 +232,9 @@ bool IsKeyDown(DWORD key);
 
 bool IsKeyJustUp(DWORD key, bool exclusive = true);
 bool ConsumeSpidermanBikeHotkey();
+bool ConsumeCelebrationHotkey();
 
 void ResetKeyState(DWORD key);
 
 // Game
 std::string VkCodeToStr(UINT8 key);
-

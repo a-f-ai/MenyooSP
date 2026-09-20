@@ -59,6 +59,7 @@
 #include "..\Misc\Gta2Cam.h"
 #include "..\Misc\JumpAroundMode.h"
 #include "..\Misc\MagnetGun.h"
+#include "../Misc/PlayerCelebration.h"
 #include "..\Misc\ManualRespawn.h"
 #include "..\Misc\MeteorShower.h"
 #include "..\Misc\RopeGun.h"
@@ -235,6 +236,7 @@ inline void MenyooMain()
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Tick");
 		Http::Heartbeat().Mark("menu", heartbeatFrame);
+		PlayerCelebration::Tick(ConsumeCelebrationHotkey());
 		Menu::Tick();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Load MenyooConfig");
