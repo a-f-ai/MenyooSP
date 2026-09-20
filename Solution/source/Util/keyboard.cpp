@@ -38,6 +38,7 @@ namespace
 {
 	KeyboardChord bikeChord;
 	KeyboardChord celebrationChord;
+	KeyboardChord spoonerMarkersChord;
 	std::mutex bikeChordMutex;
 }
 
@@ -47,8 +48,10 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 	{
 		std::lock_guard<std::mutex> lock(bikeChordMutex);
 		const bool celebrationRelease = key == VirtualKey::J && isUpNow && celebrationChord.Armed();
+		const bool spoonerMarkersRelease = key == VirtualKey::M && isUpNow && spoonerMarkersChord.Armed();
 		if (celebrationRelease) ResetKeyState(VirtualKey::J);
-		if (key < KEYS_SIZE && !celebrationRelease)
+		if (spoonerMarkersRelease) ResetKeyState(VirtualKey::M);
+		if (key < KEYS_SIZE && !celebrationRelease && !spoonerMarkersRelease)
 		{
 			keyStates[key].time = GetTickCount();
 			keyStates[key].isWithAlt = isWithAlt;
@@ -61,6 +64,7 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 				" up=" + std::to_string(isUpNow != 0) + " repeat=" + std::to_string(wasDownBefore != 0));
 		bikeChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindSpidermanBike);
 		celebrationChord.Event(key, isUpNow != 0, wasDownBefore != 0, VirtualKey::J);
+		spoonerMarkersChord.Event(key, isUpNow != 0, wasDownBefore != 0, VirtualKey::M);
 		if (key == BindSpidermanBike)
 			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey event: key=" + std::to_string(key) +
 				" up=" + std::to_string(isUpNow != 0) + " ctrl=" + std::to_string(bikeChord.Control()) +
@@ -80,6 +84,12 @@ bool ConsumeCelebrationHotkey()
 {
 	std::lock_guard<std::mutex> lock(bikeChordMutex);
 	return celebrationChord.Consume([] { ResetKeyState(VirtualKey::J); });
+}
+
+bool ConsumeSpoonerMarkersHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return spoonerMarkersChord.Consume([] { ResetKeyState(VirtualKey::M); });
 }
 
 bool IsKeyDown(DWORD key)

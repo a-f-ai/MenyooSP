@@ -2642,6 +2642,10 @@ namespace sub
 			int markerIndexInDbToDelete = -1;
 
 			AddTitle("Markers");
+			bool toggleVisibility = false;
+			AddTickol("Show Spooner Markers", Settings::bShowSpoonerMarkers, toggleVisibility, toggleVisibility);
+			if (toggleVisibility) MarkerManagement::ToggleVisibility();
+			if (Menu::IsLastDrawnOptionSelected()) Menu::add_IB(VirtualKey::M, "Ctrl+Shift: show/hide markers");
 
 			AddOption("Removal", null, nullFunc, SUB::SPOONER_MANAGEMARKERS_REMOVAL);
 
@@ -2767,7 +2771,7 @@ namespace sub
 				finalDestHeading = SelectedMarker->m_destinationHeading;
 			}
 
-			if (!dest->m_position.IsZero())
+			if (Settings::bShowSpoonerMarkers && !dest->m_position.IsZero())
 			{
 				World::DrawLine(finalPosition, finalDest, RGBA(SelectedMarker->m_colour, 200));
 				World::DrawLightWithRange(finalDest, RgbS(SelectedMarker->m_colour), 2.3f, 1.5f);

@@ -37,6 +37,7 @@ namespace sub::Spooner
 		eSpoonerModeMode spoonerModeMode = eSpoonerModeMode::GroundEase;
 
 		bool bShowModelPreviews = true;
+		bool bShowSpoonerMarkers = true;
 		bool bDisplaySpoonerInfo = true;
 		bool bShowBoxAroundSelectedEntity = false;
 		bool bSpawnDynamicProps = false;

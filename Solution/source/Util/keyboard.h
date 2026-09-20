@@ -233,6 +233,7 @@ bool IsKeyDown(DWORD key);
 bool IsKeyJustUp(DWORD key, bool exclusive = true);
 bool ConsumeSpidermanBikeHotkey();
 bool ConsumeCelebrationHotkey();
+bool ConsumeSpoonerMarkersHotkey();
 
 void ResetKeyState(DWORD key);
 

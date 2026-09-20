@@ -27,6 +27,8 @@
 
 #include "Databases.h"
 #include "SpoonerMarker.h"
+#include "SpoonerSettings.h"
+#include "../../Util/FileLogger.h"
 
 #include <string>
 #include <vector>
@@ -35,6 +37,14 @@ namespace sub::Spooner
 {
 	namespace MarkerManagement
 	{
+		void ToggleVisibility()
+		{
+			Settings::bShowSpoonerMarkers = !Settings::bShowSpoonerMarkers;
+			const std::string message = Settings::bShowSpoonerMarkers ? "Spooner markers: shown" : "Spooner markers: hidden (teleports remain active)";
+			addlog(ige::LogType::LOG_INFO, message);
+			Game::Print::PrintBottomLeft(message);
+		}
+
 		void DrawAll()
 		{
 			GTAentity myPed = PLAYER_PED_ID();
@@ -101,10 +111,10 @@ namespace sub::Spooner
 
 				bool bSelectedInSub = marker.m_selectedInSub;
 				marker.m_selectedInSub = false;
-				if (vCoordsToCheck->front().DistanceTo(finalPosition) < 80.0f)
+				if (Settings::bShowSpoonerMarkers && vCoordsToCheck->front().DistanceTo(finalPosition) < 80.0f)
 					World::DrawMarker(marker.m_type, finalPosition, finalDirection, finalRotation, (Vector3::One() * marker.m_scale), bSelectedInSub ? RGBA(marker.m_colour.Inverse(false), 240) : marker.m_colour, bSelectedInSub, false, 2, marker.m_rotateContinuously, std::string(), std::string(), false);
 
-				if (marker.m_showName)
+				if (Settings::bShowSpoonerMarkers && marker.m_showName)
 				{
 					const auto& ray = RaycastResult::Raycast(camPos, finalPosition + (Vector3::Normalize(finalPosition - camPos) * Vector3(0, -marker.m_scale, 0)), IntersectOptions::Everything);
 					if (!ray.DidHitAnything() && vCoordsToCheck->front().DistanceTo(finalPosition) < 40.0f)
@@ -289,6 +299,5 @@ namespace sub::Spooner
 	}
 
 }
-
 
 

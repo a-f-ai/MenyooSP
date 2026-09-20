@@ -91,6 +91,7 @@
 #include "..\Submenus\Spooner\Databases.h"
 #include "..\Submenus\Spooner\FileManagement.h"
 #include "..\Submenus\Spooner\SpoonerSettings.h"
+#include "../Submenus/Spooner/MarkerManagement.h"
 #include "..\Submenus\CutscenePlayer.h"
 
 #include <Windows.h>
@@ -237,6 +238,7 @@ inline void MenyooMain()
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Tick");
 		Http::Heartbeat().Mark("menu", heartbeatFrame);
 		PlayerCelebration::Tick(ConsumeCelebrationHotkey());
+		if (ConsumeSpoonerMarkersHotkey()) sub::Spooner::MarkerManagement::ToggleVisibility();
 		Menu::Tick();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Load MenyooConfig");
