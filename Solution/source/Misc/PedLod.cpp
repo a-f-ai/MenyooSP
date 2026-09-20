@@ -14,9 +14,8 @@ namespace PedLod
 {
 	namespace
 	{
-		// Ten times the game's distances keeps the author's addon peds on the
-		// full mesh across the whole of a stunt map.
-		std::atomic<float> g_multiplier{ 10.0f };
+		std::atomic<float> g_multiplier{ kGameDefault };
+		bool g_overrideApplied = false;
 	}
 
 	float Multiplier()
@@ -34,9 +33,13 @@ namespace PedLod
 	void Tick()
 	{
 		const float multiplier = g_multiplier.load();
+		if (multiplier == kGameDefault && !g_overrideApplied) return;
+
 		std::vector<Entity> peds;
 		GTAmemory::GetPedHandles(peds);
 		for (Entity ped : peds)
 			SET_PED_LOD_MULTIPLIER(ped, multiplier);
+		// Restore an earlier boost once; subsequent default ticks do not enumerate peds.
+		g_overrideApplied = multiplier != kGameDefault;
 	}
 }
