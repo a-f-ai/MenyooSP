@@ -16,9 +16,11 @@ namespace PedLod
 	constexpr float kMax = 50.0f;
 
 	float Multiplier();
-	// Clamped to [kGameDefault, kMax]: below the game's own distances peds
-	// would only get coarser, which nothing here wants.
-	void SetMultiplier(float value);
+	bool SetMultiplier(float value);
+	bool Enabled();
+	bool SetEnabled(bool enabled); // script thread: disabling restores existing peds once
+	bool Configure(const char* enabled, const char* multiplier);
+	const char* Error();
 
 	void Tick(); // script thread, once per frame
 }

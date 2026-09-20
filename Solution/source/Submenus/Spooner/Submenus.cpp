@@ -8,6 +8,7 @@
 * (at your option) any later version.
 */
 #include "Submenus.h"
+#include "..\..\Misc\PedLod.h"
 
 #include "..\..\macros.h"
 
@@ -250,6 +251,13 @@ namespace sub
 			bool rotsensG_input = 0, rotsensG_plus = 0, rotsensG_minus = 0;
 
 			AddTitle("Settings");
+			bool togglePedLod = false;
+			AddTickol("Enable Ped LOD Override", PedLod::Enabled(), togglePedLod, togglePedLod);
+			if (togglePedLod) PedLod::SetEnabled(!PedLod::Enabled());
+			float pedLodMultiplier = PedLod::Multiplier();
+			AddNumberStepper("Ped LOD Multiplier (1-50)", pedLodMultiplier, 1, 1.0);
+			if (pedLodMultiplier != PedLod::Multiplier()) PedLod::SetMultiplier(pedLodMultiplier);
+			if (PedLod::Error()[0] != '\0') AddOption(PedLod::Error());
 			AddToggle("Display Model Previews (Spooner Mode)", Settings::bShowModelPreviews);
 			AddToggle("Display Spooner Info", Settings::bDisplaySpoonerInfo);
 			AddToggle("Display Entity Surrounding Box", Settings::bShowBoxAroundSelectedEntity);

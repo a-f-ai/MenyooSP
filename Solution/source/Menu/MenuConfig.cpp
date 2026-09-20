@@ -121,7 +121,9 @@ void MenuConfig::ConfigRead()
 		addlog(ige::LogType::LOG_INFO, "Migrated SpidermanBikeButton from conflicting F6 to Ctrl+Shift+O (79)");
 	}
 	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
-	PedLod::SetMultiplier((float)ini.GetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier()));
+	if (!PedLod::Configure(ini.GetValue(section_general.c_str(), "EnablePedLodOverride", "false"),
+		ini.GetValue(section_general.c_str(), "PedLodMultiplier", "1.0")))
+		addlog(ige::LogType::LOG_ERROR, PedLod::Error());
 
 
 	std::string section_colours = "colours";/////////
@@ -398,7 +400,11 @@ void MenuConfig::SaveConfig()
 	ini.SetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
 	ini.SetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
 	ini.SetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
-	ini.SetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier());
+	if (PedLod::Error()[0] == '\0')
+	{
+		ini.SetBoolValue(section_general.c_str(), "EnablePedLodOverride", PedLod::Enabled());
+		ini.SetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier());
+	}
 
 
 	std::string section_colours = "colours";/////////

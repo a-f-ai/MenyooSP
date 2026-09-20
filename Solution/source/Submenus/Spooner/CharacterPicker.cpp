@@ -1064,13 +1064,15 @@ namespace sub::Spooner::CharacterPicker
 
 		ImGui::Separator();
 		float lodMultiplier = PedLod::Multiplier();
+		ImGui::Text("Ped LOD Override: %s (toggle in Object Spooner > Settings)", PedLod::Enabled() ? "ON" : "OFF");
+		if (PedLod::Error()[0] != '\0') ImGui::TextWrapped("LOD config error: %s", PedLod::Error());
 		ImGui::SetNextItemWidth(150.0f);
 		if (ImGui::SliderFloat("ped detail distance x", &lodMultiplier, PedLod::kGameDefault, PedLod::kMax, "%.0f"))
-			PedLod::SetMultiplier(lodMultiplier);
+			if (!PedLod::SetMultiplier(lodMultiplier)) state.status = PedLod::Error();
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("How much further out than the game would every ped keeps its full mesh.\n"
-				"Addon peds drop to auto-generated blobs otherwise. 1 = the game's own distances.\n"
-				"Applies to every ped in the world; kept in menyooConfig.ini as PedLodMultiplier.");
+				"Only applied when Enable Ped LOD Override is ON. 1 = the game's own distances.\n"
+				"OFF restores default distances and stops per-frame overrides. Multiplier is saved separately.");
 
 		// A click in the world, not on the window, while the window owns the mouse.
 		if (IsCursorMode() && !io.WantCaptureMouse && io.MouseClicked[0])
