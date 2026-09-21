@@ -66,6 +66,10 @@ echo "--- configurable boolean hotkey registry ---"
 "$compiler" "${flags[@]}" -I"$source_root/Util" "$here/BooleanHotkeyRegistryTests.cpp" -o "$build/boolean_hotkey_tests"
 "$build/boolean_hotkey_tests"
 
+echo "--- Save Range count refresh policy ---"
+"$compiler" "${flags[@]}" -I"$source_root/Submenus/Spooner" "$here/SaveRangeRefreshTests.cpp" -o "$build/save_range_refresh_tests"
+"$build/save_range_refresh_tests"
+
 echo "--- menu close and reopen state ---"
 "$compiler" "${flags[@]}" -I"$source_root/Menu" "$here/MenuStateTests.cpp" -o "$build/menu_tests"
 "$build/menu_tests"

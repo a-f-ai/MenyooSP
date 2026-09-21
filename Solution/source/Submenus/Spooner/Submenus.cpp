@@ -42,6 +42,7 @@
 #include "SpoonerEntity.h"
 #include "SpoonerMode.h"
 #include "SpoonerSettings.h"
+#include "SaveRangeRefresh.h"
 #include "Databases.h"
 #include "FileManagement.h"
 #include "MapRepair.h"
@@ -415,8 +416,16 @@ namespace sub
 				}
 			}
 
-			std::vector<Entity> vSaveRangeEntities;
-			GTAmemory::GetEntityHandles(vSaveRangeEntities, myPos, fSaveRangeRadius);
+			static SaveRangeRefreshState saveRangeRefresh;
+			static std::vector<Entity> vSaveRangeEntities;
+			const bool saveRangeSelected = *Menu::activeOptionIndex == Menu::currentOptionCount + 1;
+			if (saveRangeRefresh.ShouldRefresh(
+				static_cast<std::uint32_t>(GET_FRAME_COUNT()), saveRangeSelected,
+				fSaveRangeRadius, worldEntities.size()))
+			{
+				vSaveRangeEntities.clear();
+				GTAmemory::GetEntityHandles(vSaveRangeEntities, myPos, fSaveRangeRadius);
+			}
 			bool bSaveRange_plus = false, bSaveRange_minus = false, bSaveRange_save = false;
 			AddNumber("Save Range To File (" + std::to_string(vSaveRangeEntities.size()) + ")", fSaveRangeRadius, 0, bSaveRange_save, bSaveRange_plus, bSaveRange_minus);
 			if (Menu::IsLastDrawnOptionSelected())
@@ -425,6 +434,8 @@ namespace sub
 			if (bSaveRange_minus) { if (fSaveRangeRadius > 0.0f) fSaveRangeRadius -= 1.0f; }
 			if (bSaveRange_save)
 			{
+				vSaveRangeEntities.clear();
+				GTAmemory::GetEntityHandles(vSaveRangeEntities, myPos, fSaveRangeRadius);
 				std::string inputStr = Game::InputBox("", 28U, "Enter file name:");
 				if (inputStr.length() > 0)
 				{
