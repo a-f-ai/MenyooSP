@@ -121,6 +121,14 @@ void MenuConfig::ConfigRead()
 		addlog(ige::LogType::LOG_INFO, "Migrated SpidermanBikeButton from conflicting F6 to Ctrl+Shift+O (79)");
 	}
 	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
+	BindHideHud = ini.GetLongValue(section_general.c_str(), "HideHudToggleKey", BindHideHud);
+	BindHideHudControl = ini.GetBoolValue(section_general.c_str(), "HideHudToggleControl", BindHideHudControl);
+	BindHideHudShift = ini.GetBoolValue(section_general.c_str(), "HideHudToggleShift", BindHideHudShift);
+	BindHideHudAlt = ini.GetBoolValue(section_general.c_str(), "HideHudToggleAlt", BindHideHudAlt);
+	BindPedLodToggle = ini.GetLongValue(section_general.c_str(), "PedLodToggleKey", BindPedLodToggle);
+	BindPedLodToggleControl = ini.GetBoolValue(section_general.c_str(), "PedLodToggleControl", BindPedLodToggleControl);
+	BindPedLodToggleShift = ini.GetBoolValue(section_general.c_str(), "PedLodToggleShift", BindPedLodToggleShift);
+	BindPedLodToggleAlt = ini.GetBoolValue(section_general.c_str(), "PedLodToggleAlt", BindPedLodToggleAlt);
 	if (!PedLod::Configure(ini.GetValue(section_general.c_str(), "EnablePedLodOverride", "false"),
 		ini.GetValue(section_general.c_str(), "PedLodMultiplier", "1.0")))
 		addlog(ige::LogType::LOG_ERROR, PedLod::Error());
@@ -405,6 +413,14 @@ void MenuConfig::SaveConfig()
 		ini.SetBoolValue(section_general.c_str(), "EnablePedLodOverride", PedLod::Enabled());
 		ini.SetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier());
 	}
+	ini.SetLongValue(section_general.c_str(), "HideHudToggleKey", BindHideHud);
+	ini.SetBoolValue(section_general.c_str(), "HideHudToggleControl", BindHideHudControl);
+	ini.SetBoolValue(section_general.c_str(), "HideHudToggleShift", BindHideHudShift);
+	ini.SetBoolValue(section_general.c_str(), "HideHudToggleAlt", BindHideHudAlt);
+	ini.SetLongValue(section_general.c_str(), "PedLodToggleKey", BindPedLodToggle);
+	ini.SetBoolValue(section_general.c_str(), "PedLodToggleControl", BindPedLodToggleControl);
+	ini.SetBoolValue(section_general.c_str(), "PedLodToggleShift", BindPedLodToggleShift);
+	ini.SetBoolValue(section_general.c_str(), "PedLodToggleAlt", BindPedLodToggleAlt);
 
 
 	std::string section_colours = "colours";/////////

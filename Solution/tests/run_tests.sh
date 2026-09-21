@@ -62,6 +62,10 @@ echo "--- keyboard chord event sequence ---"
 "$compiler" "${flags[@]}" -I"$source_root/Util" "$here/KeyboardChordTests.cpp" -o "$build/chord_tests"
 "$build/chord_tests"
 
+echo "--- configurable boolean hotkey registry ---"
+"$compiler" "${flags[@]}" -I"$source_root/Util" "$here/BooleanHotkeyRegistryTests.cpp" -o "$build/boolean_hotkey_tests"
+"$build/boolean_hotkey_tests"
+
 echo "--- menu close and reopen state ---"
 "$compiler" "${flags[@]}" -I"$source_root/Menu" "$here/MenuStateTests.cpp" -o "$build/menu_tests"
 "$build/menu_tests"

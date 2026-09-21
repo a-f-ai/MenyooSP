@@ -39,6 +39,7 @@ namespace
 	KeyboardChord bikeChord;
 	KeyboardChord celebrationChord;
 	KeyboardChord spoonerMarkersChord;
+	BooleanHotkeyRegistry booleanHotkeys;
 	std::mutex bikeChordMutex;
 }
 
@@ -47,11 +48,13 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 {
 	{
 		std::lock_guard<std::mutex> lock(bikeChordMutex);
+		const bool booleanHotkeyRelease = booleanHotkeys.Event(key, isUpNow != 0, wasDownBefore != 0);
 		const bool celebrationRelease = key == VirtualKey::J && isUpNow && celebrationChord.Armed();
 		const bool spoonerMarkersRelease = key == VirtualKey::M && isUpNow && spoonerMarkersChord.Armed();
 		if (celebrationRelease) ResetKeyState(VirtualKey::J);
 		if (spoonerMarkersRelease) ResetKeyState(VirtualKey::M);
-		if (key < KEYS_SIZE && !celebrationRelease && !spoonerMarkersRelease)
+		if (booleanHotkeyRelease) ResetKeyState(key);
+		if (key < KEYS_SIZE && !booleanHotkeyRelease && !celebrationRelease && !spoonerMarkersRelease)
 		{
 			keyStates[key].time = GetTickCount();
 			keyStates[key].isWithAlt = isWithAlt;
@@ -71,6 +74,18 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 				" shift=" + std::to_string(bikeChord.Shift()) + " alt=" + std::to_string(bikeChord.Alt()) +
 				" armedBefore=" + std::to_string(armed) + " armedAfter=" + std::to_string(bikeChord.Armed()));
 	}
+}
+
+void RegisterBooleanHotkey(BooleanHotkeyAction action)
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	booleanHotkeys.Register(std::move(action));
+}
+
+std::vector<BooleanHotkeyResult> DispatchBooleanHotkeys()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return booleanHotkeys.DispatchPending();
 }
 
 

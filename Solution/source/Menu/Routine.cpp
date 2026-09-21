@@ -199,6 +199,15 @@ inline void MenyooMain()
 	addlog(ige::LogType::LOG_TRACE, "Populate Cutscene Labels");
 	sub::CutscenePlayer::PopulateCutsceneLabels();
 
+	RegisterBooleanHotkey({ "hide-hud",
+		{ static_cast<unsigned>(BindHideHud), BindHideHudControl, BindHideHudShift, BindHideHudAlt },
+		[] { return hideHUD; },
+		[](bool enabled) { hideHUD = enabled; return true; } });
+	RegisterBooleanHotkey({ "ped-lod",
+		{ static_cast<unsigned>(BindPedLodToggle), BindPedLodToggleControl, BindPedLodToggleShift, BindPedLodToggleAlt },
+		[] { return PedLod::Enabled(); },
+		[](bool enabled) { return PedLod::SetEnabled(enabled); } });
+
 	DWORD tickNow = GetTickCount();
 	srand(tickNow);
 	SET_RANDOM_SEED(tickNow);
@@ -239,6 +248,12 @@ inline void MenyooMain()
 		Http::Heartbeat().Mark("menu", heartbeatFrame);
 		PlayerCelebration::Tick(ConsumeCelebrationHotkey());
 		if (ConsumeSpoonerMarkersHotkey()) sub::Spooner::MarkerManagement::ToggleVisibility();
+		for (const auto& result : DispatchBooleanHotkeys())
+		{
+			addlog(result.success ? ige::LogType::LOG_INFO : ige::LogType::LOG_ERROR,
+				"Boolean hotkey " + result.actionId + (result.success ? " toggled to " : " rejected; remains ") +
+				(result.enabled ? "on" : "off"));
+		}
 		Menu::Tick();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Load MenyooConfig");
@@ -662,6 +677,14 @@ INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
 INT16 BindBecomePed = VirtualKey::F6;
 INT16 BindSpidermanBike = VirtualKey::O;
 INT16 BindCharacterPicker = VirtualKey::F5;
+INT16 BindHideHud = VirtualKey::H;
+bool BindHideHudControl = true;
+bool BindHideHudShift = true;
+bool BindHideHudAlt = false;
+INT16 BindPedLodToggle = VirtualKey::L;
+bool BindPedLodToggleControl = true;
+bool BindPedLodToggleShift = true;
+bool BindPedLodToggleAlt = false;
 
 INT16 bind_no_clip = VirtualKey::F3;
 

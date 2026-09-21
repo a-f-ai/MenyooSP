@@ -11,6 +11,8 @@ http://dev-c.com
 #pragma once
 
 #include <string>
+#include <vector>
+#include "BooleanHotkeyRegistry.h"
 
 typedef unsigned long DWORD;
 typedef unsigned short WORD;
@@ -234,6 +236,8 @@ bool IsKeyJustUp(DWORD key, bool exclusive = true);
 bool ConsumeSpidermanBikeHotkey();
 bool ConsumeCelebrationHotkey();
 bool ConsumeSpoonerMarkersHotkey();
+void RegisterBooleanHotkey(BooleanHotkeyAction action);
+std::vector<BooleanHotkeyResult> DispatchBooleanHotkeys();
 
 void ResetKeyState(DWORD key);
 
