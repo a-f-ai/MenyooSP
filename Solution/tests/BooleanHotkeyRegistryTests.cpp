@@ -20,6 +20,7 @@ int main()
 	BooleanHotkeyRegistry registry;
 	bool hudHidden = false;
 	bool lodEnabled = true;
+	bool fpsDisplayed = false;
 
 	registry.Register({ "hide-hud", { 0x48, true, true, false }, [&] { return hudHidden; }, [&](bool value) {
 		hudHidden = value;
@@ -27,6 +28,10 @@ int main()
 	} });
 	registry.Register({ "ped-lod", { 0x4C, true, true, false }, [&] { return lodEnabled; }, [&](bool value) {
 		lodEnabled = value;
+		return true;
+	} });
+	registry.Register({ "display-fps", { 0x46, true, true, false }, [&] { return fpsDisplayed; }, [&](bool value) {
+		fpsDisplayed = value;
 		return true;
 	} });
 
@@ -39,6 +44,13 @@ int main()
 		"Ctrl+Shift+H toggles only hide-hud on");
 	Check(hudHidden && lodEnabled, "unrelated boolean is unchanged");
 	Check(registry.DispatchPending().empty(), "release is consumed exactly once");
+
+	registry.Event(0x46, false, false);
+	registry.Event(0x46, true, false);
+	results = registry.DispatchPending();
+	Check(results.size() == 1 && results[0].actionId == "display-fps" && results[0].enabled,
+		"Ctrl+Shift+F toggles only display-fps on");
+	Check(fpsDisplayed && hudHidden && lodEnabled, "FPS toggle preserves unrelated booleans");
 
 	registry.Event(0x12, false, false);
 	registry.Event(0x4C, false, false);

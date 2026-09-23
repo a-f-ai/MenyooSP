@@ -207,6 +207,10 @@ inline void MenyooMain()
 		{ static_cast<unsigned>(BindPedLodToggle), BindPedLodToggleControl, BindPedLodToggleShift, BindPedLodToggleAlt },
 		[] { return PedLod::Enabled(); },
 		[](bool enabled) { return PedLod::SetEnabled(enabled); } });
+	RegisterBooleanHotkey({ "display-fps",
+		{ static_cast<unsigned>(BindFpsToggle), BindFpsToggleControl, BindFpsToggleShift, BindFpsToggleAlt },
+		[] { return FPSCounter::bDisplayFps; },
+		[](bool enabled) { FPSCounter::bDisplayFps = enabled; return true; } });
 
 	DWORD tickNow = GetTickCount();
 	srand(tickNow);
@@ -685,6 +689,10 @@ INT16 BindPedLodToggle = VirtualKey::L;
 bool BindPedLodToggleControl = true;
 bool BindPedLodToggleShift = true;
 bool BindPedLodToggleAlt = false;
+INT16 BindFpsToggle = VirtualKey::F;
+bool BindFpsToggleControl = true;
+bool BindFpsToggleShift = true;
+bool BindFpsToggleAlt = false;
 
 INT16 bind_no_clip = VirtualKey::F3;
 

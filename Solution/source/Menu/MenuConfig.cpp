@@ -129,6 +129,10 @@ void MenuConfig::ConfigRead()
 	BindPedLodToggleControl = ini.GetBoolValue(section_general.c_str(), "PedLodToggleControl", BindPedLodToggleControl);
 	BindPedLodToggleShift = ini.GetBoolValue(section_general.c_str(), "PedLodToggleShift", BindPedLodToggleShift);
 	BindPedLodToggleAlt = ini.GetBoolValue(section_general.c_str(), "PedLodToggleAlt", BindPedLodToggleAlt);
+	BindFpsToggle = ini.GetLongValue(section_general.c_str(), "FpsToggleKey", BindFpsToggle);
+	BindFpsToggleControl = ini.GetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
+	BindFpsToggleShift = ini.GetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
+	BindFpsToggleAlt = ini.GetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
 	if (!PedLod::Configure(ini.GetValue(section_general.c_str(), "EnablePedLodOverride", "false"),
 		ini.GetValue(section_general.c_str(), "PedLodMultiplier", "1.0")))
 		addlog(ige::LogType::LOG_ERROR, PedLod::Error());
@@ -421,6 +425,10 @@ void MenuConfig::SaveConfig()
 	ini.SetBoolValue(section_general.c_str(), "PedLodToggleControl", BindPedLodToggleControl);
 	ini.SetBoolValue(section_general.c_str(), "PedLodToggleShift", BindPedLodToggleShift);
 	ini.SetBoolValue(section_general.c_str(), "PedLodToggleAlt", BindPedLodToggleAlt);
+	ini.SetLongValue(section_general.c_str(), "FpsToggleKey", BindFpsToggle);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
 
 
 	std::string section_colours = "colours";/////////

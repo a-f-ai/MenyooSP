@@ -7,6 +7,7 @@ The shipped bindings are:
 
 - `Ctrl+Shift+H`: `hide-hud`
 - `Ctrl+Shift+L`: `ped-lod`
+- `Ctrl+Shift+F`: `display-fps`
 
 Change the `Key`, `Control`, `Shift`, and `Alt` values in the `[general]`
 section of `menyooStuff/menyooConfig.ini`. Keys use Windows virtual-key codes.
