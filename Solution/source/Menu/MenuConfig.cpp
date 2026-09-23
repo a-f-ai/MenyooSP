@@ -133,6 +133,10 @@ void MenuConfig::ConfigRead()
 	BindFpsToggleControl = ini.GetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
 	BindFpsToggleShift = ini.GetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
 	BindFpsToggleAlt = ini.GetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
+	BindPreferredMapLoad = ini.GetLongValue(section_general.c_str(), "PreferredMapLoadKey", BindPreferredMapLoad);
+	BindPreferredMapLoadControl = ini.GetBoolValue(section_general.c_str(), "PreferredMapLoadControl", BindPreferredMapLoadControl);
+	BindPreferredMapLoadShift = ini.GetBoolValue(section_general.c_str(), "PreferredMapLoadShift", BindPreferredMapLoadShift);
+	BindPreferredMapLoadAlt = ini.GetBoolValue(section_general.c_str(), "PreferredMapLoadAlt", BindPreferredMapLoadAlt);
 	if (!PedLod::Configure(ini.GetValue(section_general.c_str(), "EnablePedLodOverride", "false"),
 		ini.GetValue(section_general.c_str(), "PedLodMultiplier", "1.0")))
 		addlog(ige::LogType::LOG_ERROR, PedLod::Error());
@@ -224,7 +228,7 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::Settings::bAddToDbAsMissionEntities = ini.GetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
 	sub::Spooner::Settings::bClearDbBeforeLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
-	sub::Spooner::Settings::bExtraSunnyAfterMapLoad = ini.GetBoolValue(section_spooner.c_str(), "ExtraSunnyAfterMapLoad", sub::Spooner::Settings::bExtraSunnyAfterMapLoad);
+	sub::Spooner::Settings::preferredMapRelativePath = ini.GetValue(section_spooner.c_str(), "PreferredMap", sub::Spooner::Settings::preferredMapRelativePath.c_str());
 	sub::Spooner::Settings::bKeepPositionWhenAttaching = ini.GetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	sub::Spooner::Settings::spoonerModeMode = (sub::Spooner::eSpoonerModeMode)ini.GetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
 	sub::Spooner::Settings::bAutoSaveDb = ini.GetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);
@@ -429,6 +433,10 @@ void MenuConfig::SaveConfig()
 	ini.SetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
 	ini.SetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
 	ini.SetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
+	ini.SetLongValue(section_general.c_str(), "PreferredMapLoadKey", BindPreferredMapLoad);
+	ini.SetBoolValue(section_general.c_str(), "PreferredMapLoadControl", BindPreferredMapLoadControl);
+	ini.SetBoolValue(section_general.c_str(), "PreferredMapLoadShift", BindPreferredMapLoadShift);
+	ini.SetBoolValue(section_general.c_str(), "PreferredMapLoadAlt", BindPreferredMapLoadAlt);
 
 
 	std::string section_colours = "colours";/////////
@@ -517,7 +525,7 @@ void MenuConfig::SaveConfig()
 	ini.SetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	ini.SetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
 	ini.SetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
-	ini.SetBoolValue(section_spooner.c_str(), "ExtraSunnyAfterMapLoad", sub::Spooner::Settings::bExtraSunnyAfterMapLoad);
+	ini.SetValue(section_spooner.c_str(), "PreferredMap", sub::Spooner::Settings::preferredMapRelativePath.c_str());
 	ini.SetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	ini.SetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
 	ini.SetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);

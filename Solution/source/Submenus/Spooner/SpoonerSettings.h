@@ -50,7 +50,7 @@ namespace sub::Spooner
 		// because a map that expects to be layered on top of another is a
 		// legitimate thing to build.
 		extern bool bClearDbBeforeLoadingFile;
-		extern bool bExtraSunnyAfterMapLoad;
+		extern std::string preferredMapRelativePath;
 
 		extern bool bGridSnapEnabled;
 		extern float gridSnapSize;
@@ -64,5 +64,3 @@ namespace sub::Spooner
 	}
 
 }
-
-

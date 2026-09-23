@@ -224,6 +224,10 @@ namespace Http::EntityApi
 				? (request.modelLabel.empty() ? IntToHexString(request.model, true) : request.modelLabel)
 				: request.name;
 			out.handle.FreezePosition(!request.dynamic);
+			if (type == EntityType::PROP && request.dynamic)
+			{
+				ACTIVATE_PHYSICS(out.handle.Handle());
+			}
 			out.handle.SetMissionEntity(true);
 			out.handle.SetLODDistance(1000000);
 

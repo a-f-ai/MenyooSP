@@ -51,7 +51,7 @@ namespace sub::Spooner
 		
 		bool bTeleportToReferenceWhenLoadingFile = true;
 		bool bClearDbBeforeLoadingFile = false;
-		bool bExtraSunnyAfterMapLoad = true;
+		std::string preferredMapRelativePath;
 
 		bool bGridSnapEnabled = false; // use SnapPos / SnapRot to get the snapped position / rotation Vector3
 		float gridSnapSize = 1.0f;
@@ -65,5 +65,3 @@ namespace sub::Spooner
 	}
 
 }
-
-

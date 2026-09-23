@@ -60,6 +60,7 @@
 #include "..\Misc\JumpAroundMode.h"
 #include "..\Misc\MagnetGun.h"
 #include "../Misc/PlayerCelebration.h"
+#include "../Misc/MapEnvironment.h"
 #include "..\Misc\ManualRespawn.h"
 #include "..\Misc\MeteorShower.h"
 #include "..\Misc\RopeGun.h"
@@ -174,7 +175,7 @@ void Menu::justopened()
 	menuHasNotOpened = false;
 }
 inline void MenyooMain()
-{	
+{
 	bool firstTick = true;
 	addlog(ige::LogType::LOG_TRACE, "Loading Textures");
 	DxHookIMG::LoadAllMenyooTexturesInit();
@@ -250,8 +251,10 @@ inline void MenyooMain()
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Tick");
 		Http::Heartbeat().Mark("menu", heartbeatFrame);
+		sub::Spooner::FileManagement::TickMapLoadCrashJournal();
 		PlayerCelebration::Tick(ConsumeCelebrationHotkey());
 		if (ConsumeSpoonerMarkersHotkey()) sub::Spooner::MarkerManagement::ToggleVisibility();
+		if (ConsumePreferredMapHotkey()) sub::Spooner::FileManagement::LoadPreferredMap();
 		for (const auto& result : DispatchBooleanHotkeys())
 		{
 			addlog(result.success ? ige::LogType::LOG_INFO : ige::LogType::LOG_ERROR,
@@ -693,6 +696,10 @@ INT16 BindFpsToggle = VirtualKey::F;
 bool BindFpsToggleControl = true;
 bool BindFpsToggleShift = true;
 bool BindFpsToggleAlt = false;
+INT16 BindPreferredMapLoad = VirtualKey::Q;
+bool BindPreferredMapLoadControl = true;
+bool BindPreferredMapLoadShift = true;
+bool BindPreferredMapLoadAlt = false;
 
 INT16 bind_no_clip = VirtualKey::F3;
 
@@ -3586,11 +3593,11 @@ static void TickWorldState()
 
 	if (!IS_PLAYER_SWITCH_IN_PROGRESS())
 	{
-		if (pauseClock)
+		if (pauseClock && !MapEnvironment::IsActive())
 		{
 			NETWORK_OVERRIDE_CLOCK_TIME(pauseClockH, pauseClockM, 0);
 		}
-		if (syncClock)
+		if (syncClock && !MapEnvironment::IsActive())
 		{
 			SetSyncClockTime();
 		}
