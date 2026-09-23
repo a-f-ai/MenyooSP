@@ -83,7 +83,7 @@ namespace sub::Spooner
 			MapLoadJournalState g_mapLoadJournal;
 
 			void WriteMapLoadJournalRecord(const char* event, const char* stage,
-				size_t index = std::numeric_limits<size_t>::max(), const std::string& name = {},
+				size_t index = (std::numeric_limits<size_t>::max)(), const std::string& name = {},
 				Hash model = 0, int type = 0, bool entityExists = false)
 			{
 				if (g_mapLoadJournal.journalPath.empty())
@@ -103,7 +103,7 @@ namespace sub::Spooner
 					{ "placementsSeen", g_mapLoadJournal.placementsSeen },
 					{ "placementsDone", g_mapLoadJournal.placementsDone },
 				};
-				if (index != std::numeric_limits<size_t>::max())
+				if (index != (std::numeric_limits<size_t>::max)())
 				{
 					record["index"] = index;
 					record["name"] = name;
