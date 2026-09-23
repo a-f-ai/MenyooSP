@@ -398,3 +398,7 @@ struct ScopedWeaponTargetOverride
 };
 
 extern int GetRandomSpriteId();
+extern INT16 BindFpsToggle;
+extern bool BindFpsToggleControl;
+extern bool BindFpsToggleShift;
+extern bool BindFpsToggleAlt;

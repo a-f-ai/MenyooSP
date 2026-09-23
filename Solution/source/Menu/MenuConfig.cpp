@@ -686,3 +686,11 @@ void MenuConfig::ConfigResetHaxValues()
 	MenuConfig::ConfigRead();
 
 }
+	BindFpsToggle = ini.GetLongValue(section_general.c_str(), "FpsToggleKey", BindFpsToggle);
+	BindFpsToggleControl = ini.GetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
+	BindFpsToggleShift = ini.GetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
+	BindFpsToggleAlt = ini.GetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
+	ini.SetLongValue(section_general.c_str(), "FpsToggleKey", BindFpsToggle);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);

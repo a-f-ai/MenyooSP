@@ -26,3 +26,4 @@ Add the matching key and modifier fields to `MenuConfig::ConfigRead()` and
 `MenuConfig::SaveConfig()`. Action IDs and complete chords must be unique;
 duplicates stop initialization with an explicit error instead of selecting an
 action implicitly.
+- `Ctrl+Shift+F`: `display-fps`

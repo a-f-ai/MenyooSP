@@ -4244,3 +4244,11 @@ void ThreadMenuLoops2()
 		}
 	}
 }
+	RegisterBooleanHotkey({ "display-fps",
+		{ static_cast<unsigned>(BindFpsToggle), BindFpsToggleControl, BindFpsToggleShift, BindFpsToggleAlt },
+		[] { return FPSCounter::bDisplayFps; },
+		[](bool enabled) { FPSCounter::bDisplayFps = enabled; return true; } });
+INT16 BindFpsToggle = VirtualKey::F;
+bool BindFpsToggleControl = true;
+bool BindFpsToggleShift = true;
+bool BindFpsToggleAlt = false;
