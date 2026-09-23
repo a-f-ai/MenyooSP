@@ -63,6 +63,7 @@ namespace sub::Spooner
 		bool SaveDbToFile(const std::string& filePath, bool bForceReferenceCoords);
 		bool SaveWorldToFile(const std::string& filePath, std::vector<Entity>& vEntityHandles, std::vector<SpoonerMarker>& vMarkers);
 		bool LoadPlacementsFromFile(const std::string& filePath);
+		bool LoadPreferredMap();
 
 		bool LoadPlacementsFromSP00NFile(const std::string& filePath);
 
@@ -70,6 +71,5 @@ namespace sub::Spooner
 	}
 
 }
-
 
 

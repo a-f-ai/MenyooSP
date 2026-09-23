@@ -24,6 +24,7 @@
 #include "PatternSnapshot.h"
 #include "SpidermanBike.h"
 #include "WorldApi.h"
+#include "../Misc/MapEnvironment.h"
 
 #include "../Natives/natives2.h"
 #include "../Scripting/Raycast.h"
@@ -524,6 +525,7 @@ namespace Http::Server
 				}) },
 				{ "world", json::array({
 					"GET /world/player     where the player is, plus the ground height under them",
+					"GET /world/environment actual clock/weather and marked-map extrasunny-noon-v1 ownership; no mutations",
 					"GET /world/camera     gameplay camera, and the spooner camera when it is on",
 					"GET /world/ground?x=&y=&z=   the surface below a point",
 					"GET /world/water?x=&y=&z=    the no-wave water surface; 422 when no water exists",
@@ -766,6 +768,11 @@ namespace Http::Server
 			});
 
 			// ---- world ----
+			server.Get("/world/environment", [](const httplib::Request& request, httplib::Response& response) {
+				Handle(request, response, [](const httplib::Request&) {
+					return std::function<Response()>([] { return MapEnvironment::Describe(); });
+				});
+			});
 
 			server.Get("/world/player", [](const httplib::Request& request, httplib::Response& response) {
 				Handle(request, response, [](const httplib::Request&) {

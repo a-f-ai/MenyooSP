@@ -19,6 +19,7 @@
 * Copyright (C) 2019  MAFINS
 */
 #include "World.h"
+#include "../Misc/MapEnvironment.h"
 
 #include "..\macros.h"
 
@@ -95,36 +96,44 @@ namespace World
 
 	void SetWeather(WeatherType weather)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		CLEAR_OVERRIDE_WEATHER();
 		SET_WEATHER_TYPE_NOW((PCHAR)sWeatherNames[static_cast<int>(weather)].second.c_str());
 	}
 	void SetWeather(const std::string& weatherName)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		CLEAR_OVERRIDE_WEATHER();
 		SET_WEATHER_TYPE_NOW(weatherName.c_str());
 	}
 	void SetWeatherOverTime(WeatherType weather, DWORD ms)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		SET_WEATHER_TYPE_OVERTIME_PERSIST((PCHAR)sWeatherNames[static_cast<int>(weather)].second.c_str(), float(ms) / 1000.0f);
 	}
 	void SetWeatherOverTime(const std::string& weatherName, DWORD ms)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		SET_WEATHER_TYPE_OVERTIME_PERSIST(weatherName.c_str(), float(ms) / 1000.0f);
 	}
 	void SetWeatherOverride(WeatherType weather)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		SET_OVERRIDE_WEATHER(sWeatherNames[static_cast<int>(weather)].second.c_str());
 	}
 	void SetWeatherOverride(const std::string& weatherName)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		SET_OVERRIDE_WEATHER(weatherName.c_str());
 	}
 	void ClearWeatherOverride()
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		CLEAR_OVERRIDE_WEATHER();
 	}
 	void SetWeatherTransition(WeatherType from, WeatherType to, DWORD ms)
 	{
+		if (MapEnvironment::RejectManualChange()) return;
 		SET_CURR_WEATHER_STATE(GET_HASH_KEY(sWeatherNames[static_cast<int>(from)].second), GET_HASH_KEY(sWeatherNames[static_cast<int>(to)].second), float(ms) / 1000.0f);
 	}
 	void GetWeatherTransition(WeatherType& from, WeatherType& to, DWORD& time)
@@ -875,4 +884,3 @@ void ClearAttachmentsOffEntity(const GTAentity& entity, const EntityType& entTyp
 		}
 	}
 }
-

@@ -236,6 +236,14 @@ extern INT16 BindPedLodToggle;
 extern bool BindPedLodToggleControl;
 extern bool BindPedLodToggleShift;
 extern bool BindPedLodToggleAlt;
+extern INT16 BindFpsToggle;
+extern bool BindFpsToggleControl;
+extern bool BindFpsToggleShift;
+extern bool BindFpsToggleAlt;
+extern INT16 BindPreferredMapLoad;
+extern bool BindPreferredMapLoadControl;
+extern bool BindPreferredMapLoadShift;
+extern bool BindPreferredMapLoadAlt;
 extern bool showFullHUD;
 extern bool pauseClock;
 extern bool syncClock;
@@ -398,7 +406,3 @@ struct ScopedWeaponTargetOverride
 };
 
 extern int GetRandomSpriteId();
-extern INT16 BindFpsToggle;
-extern bool BindFpsToggleControl;
-extern bool BindFpsToggleShift;
-extern bool BindFpsToggleAlt;

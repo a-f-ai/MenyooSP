@@ -9,6 +9,7 @@
 */
 #include "EntityManagement.h"
 #include "../../Http/PatternSnapshot.h"
+#include "../../Misc/MapEnvironment.h"
 
 #include "..\..\macros.h"
 
@@ -114,6 +115,7 @@ namespace sub::Spooner
 
 		void ClearDb()
 		{
+			MapEnvironment::Release("Spooner database cleared");
 			Databases::EntityDb.clear();
 			Databases::RelationshipDb.clear();
 			BlipManagement::ClearAllRefCoordBlips();
@@ -1025,5 +1027,4 @@ namespace sub::Spooner
 	}
 
 }
-
 

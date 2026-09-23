@@ -28,5 +28,14 @@ int main()
     canonical.Event(79,false,false,79);canonical.Event(16,true,false,79);canonical.Event(17,true,false,79);canonical.Event(79,true,false,79);
     bool oldO=true;
     check(canonical.Consume([&] { oldO=false; }) && !oldO,"CtrlShiftO survives released modifiers and consumes only O");
+    KeyboardChord configurable;
+    configurable.Event(18,false,false,81,false,false,true);
+    configurable.Event(81,false,false,81,false,false,true);
+    configurable.Event(81,true,false,81,false,false,true);
+    check(configurable.Consume([] {}),"configured Alt+Q chord is accepted");
+    configurable.Event(17,false,false,81,false,false,true);
+    configurable.Event(81,false,false,81,false,false,true);
+    configurable.Event(81,true,false,81,false,false,true);
+    check(!configurable.Consume([] {}),"extra modifier rejects configured chord");
     return failures?1:0;
 }

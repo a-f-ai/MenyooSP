@@ -9,6 +9,7 @@
 */
 #include "FileManagement.h"
 #include "../../Http/PatternSnapshot.h"
+#include "../../Misc/MapEnvironment.h"
 
 #include "..\..\macros.h"
 
@@ -39,6 +40,7 @@
 #include "RelationshipManagement.h"
 #include "EntityManagement.h"
 #include "SpoonerMode.h"
+#include "SpoonerSettings.h"
 #include "Databases.h"
 #include "BlipManagement.h"
 #include "MarkerManagement.h"
@@ -50,6 +52,8 @@
 #include "SpoonerBlips.h"
 
 #include <string>
+#include <algorithm>
+#include <cctype>
 #include <unordered_set>
 #include <vector>
 #include <pugixml/src/pugixml.hpp>
@@ -60,6 +64,25 @@ namespace sub::Spooner
 	namespace FileManagement
 	{
 		std::string _oldAudioAlias;
+		static bool IsValidPreferredMapRelativePath(std::string path)
+		{
+			if (path.empty() || path.front() == '\\' || path.front() == '/' || path.find(':') != std::string::npos)
+				return false;
+			std::replace(path.begin(), path.end(), '/', '\\');
+			size_t start = 0;
+			while (start < path.size())
+			{
+				const size_t end = path.find('\\', start);
+				const std::string component = path.substr(start, end - start);
+				if (component.empty() || component == "." || component == "..") return false;
+				if (end == std::string::npos) break;
+				start = end + 1;
+			}
+			if (path.size() < 4) return false;
+			std::string extension = path.substr(path.size() - 4);
+			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+			return extension == ".xml";
+		}
 		const std::vector<std::string> drawableComponentSlotNames = {
 			"head", "berd", "hair", "uppr", "lowr", "hand", "feet", "teef", "accs", "task", "decl", "jbib"
 		};
@@ -1514,6 +1537,8 @@ namespace sub::Spooner
 			nodeDecleration.append_attribute("encoding") = "UTF-8";
 
 			auto nodeRoot = doc.append_child("SpoonerPlacements");
+			if (MapEnvironment::IsActive())
+				nodeRoot.append_child("MapEnvironment").append_attribute("policy") = MapEnvironment::Policy;
 
 			if (nodeNote)
 			{
@@ -1783,6 +1808,8 @@ namespace sub::Spooner
 			nodeDecleration.append_attribute("encoding") = "UTF-8";
 
 			auto nodeRoot = doc.append_child("SpoonerPlacements");
+			if (MapEnvironment::IsActive())
+				nodeRoot.append_child("MapEnvironment").append_attribute("policy") = MapEnvironment::Policy;
 
 			if (nodeNote)
 			{
@@ -1975,6 +2002,19 @@ namespace sub::Spooner
 			const Vector3& myPos = myPed.GetPosition();
 
 			pugi::xml_node nodeRoot = doc.child("SpoonerPlacements");
+			const auto environment = nodeRoot.child("MapEnvironment");
+			const bool lockEnvironment = static_cast<bool>(environment);
+			const std::string requestedWeather = nodeRoot.child("WeatherToSet").text().as_string();
+			if (!nodeRoot || (lockEnvironment &&
+				(environment.next_sibling("MapEnvironment") ||
+				std::string(environment.attribute("policy").value()) != MapEnvironment::Policy ||
+				(!requestedWeather.empty() && requestedWeather != "EXTRASUNNY") || NETWORK_IS_IN_SESSION())))
+			{
+				addlog(ige::LogType::LOG_ERROR, "Invalid, duplicate, conflicting or unsupported map environment policy: " + filePath);
+				Game::Print::PrintBottomLeft("Map environment policy is invalid; see menyooLog.txt");
+				return false;
+			}
+			MapEnvironment::Release("loading next map");
 
 			auto nodeIplsToUnload = nodeRoot.child("IPLsToRemove");
 			for (auto nodeIplToUnload = nodeIplsToUnload.first_child(); nodeIplToUnload; nodeIplToUnload = nodeIplToUnload.next_sibling())
@@ -2099,7 +2139,7 @@ namespace sub::Spooner
 			//=================================================================
 
 			auto nodeWeatherToSet = nodeRoot.child("WeatherToSet");
-			if (nodeWeatherToSet)
+			if (nodeWeatherToSet && !lockEnvironment)
 			{
 				std::string weatherToSet = nodeWeatherToSet.text().as_string();
 				if (weatherToSet.length() > 0)
@@ -2354,19 +2394,41 @@ namespace sub::Spooner
 			Menu::SetSub_closed();
 
 			Http::Pattern::Sources().Complete(sourceMap);
-			if (Settings::bExtraSunnyAfterMapLoad)
+			if (lockEnvironment && !MapEnvironment::Acquire(filePath)) return false;
+			return true;
+		}
+
+		bool LoadPreferredMap()
+		{
+			const std::string& relativePath = Settings::preferredMapRelativePath;
+			if (relativePath.empty())
 			{
-				CLEAR_OVERRIDE_WEATHER();
-				CLEAR_WEATHER_TYPE_PERSIST();
-				SET_WEATHER_TYPE_NOW("EXTRASUNNY");
-				if (GET_PREV_WEATHER_TYPE_HASH_NAME() != GET_HASH_KEY("EXTRASUNNY"))
-				{
-					addlog(ige::LogType::LOG_ERROR, "Map placements loaded, but EXTRASUNNY weather readback failed: " + filePath);
-					Game::Print::PrintBottomLeft("Map loaded, but EXTRASUNNY weather could not be applied. See menyooLog.txt.");
-					return false;
-				}
-				addlog(ige::LogType::LOG_INFO, "Map load completion: EXTRASUNNY applied once: " + filePath);
+				Game::Print::ShowNotification("~r~Error:", "No preferred Spooner map is selected.");
+				addlog(ige::LogType::LOG_ERROR, "Preferred Spooner map hotkey rejected: no map selected");
+				return false;
 			}
+			if (!IsValidPreferredMapRelativePath(relativePath))
+			{
+				Game::Print::ShowNotification("~r~Error:", "Preferred Spooner map path is invalid.");
+				addlog(ige::LogType::LOG_ERROR, "Preferred Spooner map hotkey rejected invalid relative path: " + relativePath);
+				return false;
+			}
+
+			const std::string filePath = GetPathffA(Pathff::Spooner, true) + relativePath;
+			if (!does_file_exist(filePath))
+			{
+				Game::Print::ShowNotification("~r~Error:", "Preferred Spooner map file is missing.");
+				addlog(ige::LogType::LOG_ERROR, "Preferred Spooner map file does not exist: " + filePath);
+				return false;
+			}
+			if (!LoadPlacementsFromFile(filePath))
+			{
+				Game::Print::ShowNotification("~r~Error:", "Unable to load preferred Spooner map.");
+				addlog(ige::LogType::LOG_ERROR, "Unable to load preferred Spooner map: " + filePath);
+				return false;
+			}
+
+			Game::Print::PrintBottomLeft("Preferred map ~b~loaded~s~.");
 			return true;
 		}
 

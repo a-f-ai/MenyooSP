@@ -39,6 +39,7 @@ namespace
 	KeyboardChord bikeChord;
 	KeyboardChord celebrationChord;
 	KeyboardChord spoonerMarkersChord;
+	KeyboardChord preferredMapChord;
 	BooleanHotkeyRegistry booleanHotkeys;
 	std::mutex bikeChordMutex;
 }
@@ -51,10 +52,12 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 		const bool booleanHotkeyRelease = booleanHotkeys.Event(key, isUpNow != 0, wasDownBefore != 0);
 		const bool celebrationRelease = key == VirtualKey::J && isUpNow && celebrationChord.Armed();
 		const bool spoonerMarkersRelease = key == VirtualKey::M && isUpNow && spoonerMarkersChord.Armed();
+		const bool preferredMapRelease = key == BindPreferredMapLoad && isUpNow && preferredMapChord.Armed();
 		if (celebrationRelease) ResetKeyState(VirtualKey::J);
 		if (spoonerMarkersRelease) ResetKeyState(VirtualKey::M);
+		if (preferredMapRelease) ResetKeyState(BindPreferredMapLoad);
 		if (booleanHotkeyRelease) ResetKeyState(key);
-		if (key < KEYS_SIZE && !booleanHotkeyRelease && !celebrationRelease && !spoonerMarkersRelease)
+		if (key < KEYS_SIZE && !booleanHotkeyRelease && !celebrationRelease && !spoonerMarkersRelease && !preferredMapRelease)
 		{
 			keyStates[key].time = GetTickCount();
 			keyStates[key].isWithAlt = isWithAlt;
@@ -68,6 +71,8 @@ void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, 
 		bikeChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindSpidermanBike);
 		celebrationChord.Event(key, isUpNow != 0, wasDownBefore != 0, VirtualKey::J);
 		spoonerMarkersChord.Event(key, isUpNow != 0, wasDownBefore != 0, VirtualKey::M);
+		preferredMapChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindPreferredMapLoad,
+			BindPreferredMapLoadControl, BindPreferredMapLoadShift, BindPreferredMapLoadAlt);
 		if (key == BindSpidermanBike)
 			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey event: key=" + std::to_string(key) +
 				" up=" + std::to_string(isUpNow != 0) + " ctrl=" + std::to_string(bikeChord.Control()) +
@@ -105,6 +110,12 @@ bool ConsumeSpoonerMarkersHotkey()
 {
 	std::lock_guard<std::mutex> lock(bikeChordMutex);
 	return spoonerMarkersChord.Consume([] { ResetKeyState(VirtualKey::M); });
+}
+
+bool ConsumePreferredMapHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return preferredMapChord.Consume([] { ResetKeyState(BindPreferredMapLoad); });
 }
 
 bool IsKeyDown(DWORD key)
