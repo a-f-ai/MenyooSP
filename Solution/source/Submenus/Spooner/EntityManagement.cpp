@@ -9,6 +9,7 @@
 */
 #include "EntityManagement.h"
 #include "../../Http/PatternSnapshot.h"
+#include "../../Misc/MapEnvironment.h"
 
 #include "..\..\macros.h"
 
@@ -114,6 +115,7 @@ namespace sub::Spooner
 
 		void ClearDb()
 		{
+			MapEnvironment::Release("Spooner database cleared");
 			Databases::EntityDb.clear();
 			Databases::RelationshipDb.clear();
 			BlipManagement::ClearAllRefCoordBlips();
@@ -398,7 +400,7 @@ namespace sub::Spooner
 			newEntity.handle.FreezePosition(true);
 			newEntity.handle.FreezePosition(bFreezePos);
 			newEntity.handle.SetDynamic(bDynamic);
-			newEntity.handle.SetLODDistance(1000000);
+			newEntity.handle.SetLODDistance(500);
 			newEntity.handle.SetMissionEntity(true);
 			newEntity.handle.SetInvincible(Settings::bSpawnInvincibleEntities);
 			newEntity.handle.SetExplosionProof(Settings::bSpawnInvincibleEntities);
@@ -479,7 +481,7 @@ namespace sub::Spooner
 			SET_NETWORK_ID_CAN_MIGRATE(PED_TO_NET(newEntity.handle.Handle()), true);
 			newEntity.handle.FreezePosition(bFreezePos);
 			newEntity.handle.SetDynamic(bDynamic);
-			newEntity.handle.SetLODDistance(1000000);
+			newEntity.handle.SetLODDistance(500);
 			newEntity.handle.SetMissionEntity(true);
 			newEntity.handle.SetInvincible(Settings::bSpawnInvincibleEntities);
 			newEntity.handle.SetExplosionProof(Settings::bSpawnInvincibleEntities);
@@ -582,7 +584,7 @@ namespace sub::Spooner
 			GTAvehicle(newEntity.handle).CloseAllDoors(true);
 			newEntity.handle.FreezePosition(bFreezePos);
 			newEntity.handle.SetDynamic(bDynamic);
-			newEntity.handle.SetLODDistance(1000000);
+			newEntity.handle.SetLODDistance(500);
 			newEntity.handle.SetMissionEntity(true);
 			newEntity.handle.SetInvincible(Settings::bSpawnInvincibleEntities);
 			newEntity.handle.SetExplosionProof(Settings::bSpawnInvincibleEntities);
@@ -754,7 +756,7 @@ namespace sub::Spooner
 
 			newEntity.handle.FreezePosition(bFreezePos);
 			newEntity.handle.SetDynamic(bDynamic);
-			newEntity.handle.SetLODDistance(1000000);
+			newEntity.handle.SetLODDistance(500);
 			newEntity.handle.SetMissionEntity(true);
 			newEntity.handle.SetVisible(orig.handle.IsVisible());
 			newEntity.handle.SetInvincible(orig.handle.IsInvincible());
@@ -1025,5 +1027,3 @@ namespace sub::Spooner
 	}
 
 }
-
-

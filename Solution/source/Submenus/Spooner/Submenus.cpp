@@ -30,6 +30,7 @@
 #include "..\..\Util\StringManip.h"
 #include "..\..\Menu\FolderPreviewBmps.h"
 #include "..\..\Menu\MenuCategory.h"
+#include "..\..\Menu\MenuConfig.h"
 #include "..\..\Scripting\DxHookIMG.h"
 #include "..\..\Scripting\GTAblip.h"
 #include "..\..\Scripting\TimecycleModification.h"
@@ -689,6 +690,21 @@ namespace sub
 			std::string filePath = _dir + "\\" + _name + ".xml";
 
 			AddTitle(_name);
+
+			const std::string spoonerRoot = GetPathffA(Pathff::Spooner, false);
+			const std::string relativePath = filePath.substr(spoonerRoot.size() + 1);
+			const bool isPreferred = Settings::preferredMapRelativePath == relativePath;
+			const std::string preferredLabel = Settings::preferredMapRelativePath.empty()
+				? "None"
+				: Settings::preferredMapRelativePath;
+			AddOption(isPreferred ? "Preferred Map: This map" : "Preferred Map: " + preferredLabel, null);
+			bool bSetPreferred = false;
+			AddOption("Set as Preferred Map", bSetPreferred); if (bSetPreferred)
+			{
+				Settings::preferredMapRelativePath = relativePath;
+				MenuConfig::SaveConfig();
+				Game::Print::ShowNotification("~g~Preferred Map:", relativePath);
+			}
 
 			bool bTeleToRef = false;
 			AddOption("Teleport To Reference", bTeleToRef); if (bTeleToRef)

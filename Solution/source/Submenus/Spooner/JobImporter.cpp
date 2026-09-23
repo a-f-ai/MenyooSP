@@ -1399,7 +1399,7 @@ namespace sub::Spooner::JobConverter
             }
 
             nodePlacement.append_child("OpacityLevel").text() = 255;
-            nodePlacement.append_child("LodDistance").text() = 16960;
+            nodePlacement.append_child("LodDistance").text() = 500;
             nodePlacement.append_child("IsVisible").text() = "true";
             nodePlacement.append_child("MaxHealth").text() = 1000;
             nodePlacement.append_child("Health").text() = 1000;

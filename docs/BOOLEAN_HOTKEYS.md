@@ -13,6 +13,14 @@ Change the `Key`, `Control`, `Shift`, and `Alt` values in the `[general]`
 section of `menyooStuff/menyooConfig.ini`. Keys use Windows virtual-key codes.
 Restart Menyoo after changing a binding.
 
+The preferred Spooner map action is separate from the boolean registry. Select
+an XML map in `Manage Saved Files`, choose `Set as Preferred Map`, then press
+`Ctrl+Shift+Q` to load it through the normal placements loader. Its relative
+path is stored as `PreferredMap` in `[object-spooner]`; map XML is not changed.
+The chord uses `PreferredMapLoadKey`, `PreferredMapLoadControl`,
+`PreferredMapLoadShift`, and `PreferredMapLoadAlt` in `[general]`. A missing or
+unset preferred map reports an error and does not load another map.
+
 To add a third boolean action, register it beside the existing actions in
 `MenyooMain()`:
 

@@ -8,11 +8,19 @@
 * (at your option) any later version.
 */
 #include "TimeOptions.h"
+#include "../Misc/MapEnvironment.h"
 
 namespace sub
 {
 	void TimeMenu()
 	{
+		if (MapEnvironment::IsActive())
+		{
+			AddTitle("Time");
+			AddOption("Locked by active map: 12:00 noon");
+			AddOption("Unload the map to restore time controls");
+			return;
+		}
 		bool pauseClockToggle = false;
 		bool hourPlus = false;
 		bool hourMinus = false;
