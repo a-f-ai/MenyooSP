@@ -134,7 +134,7 @@ namespace sub::TeleportLocations_catind
 				Menu::SetPreviousMenu();
 				return;
 			}
-			GTAped ped = g_Ped1;
+			GTAped ped = g_activePedHandle;
 			AddTitle(currentWarehouseInfo.location->name);
 
 			for (auto& o : vOptionArrays)
@@ -151,7 +151,7 @@ namespace sub::TeleportLocations_catind
 				DO_SCREEN_FADE_OUT(50);
 				CreateWarehouse(currentWarehouseInfo);
 				TeleportPedToWarehouse(ped, currentWarehouseInfo);
-				//Menu::SetSub_previous();
+				//Menu::SetPreviousMenu();
 				DO_SCREEN_FADE_IN(200);
 				return;
 			}

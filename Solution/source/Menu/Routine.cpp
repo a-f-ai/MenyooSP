@@ -1,4 +1,4 @@
-﻿/*
+/*
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 * Copyright (C) 2019  MAFINS
 *
@@ -14,6 +14,19 @@
 #include "Menu.h"
 #include "MenuConfig.h"
 #include "../Submenus/Spooner/ImGuiSpooner.h"
+#include "..\Http\HttpServer.h"
+#include "..\Http\GameFiberHeartbeat.h"
+#include "..\Http\PlayerApi.h"
+#include "../Http/SpidermanBike.h"
+#include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Submenus\Spooner\CharacterPicker.h"
+#include "..\Misc\PedLod.h"
+#include "..\Submenus\Spooner\SpoonerEntity.h"
+#include "..\Submenus\Spooner\SpoonerMode.h"
+#include "..\Submenus\Spooner\ImGuiSpooner.h"
+#include "..\Util\keyboard.h"
+
+#include <mutex>
 
 #include "..\Util\FileLogger.h"
 #include "..\Util\ExePath.h"
@@ -46,6 +59,8 @@
 #include "..\Misc\Gta2Cam.h"
 #include "..\Misc\JumpAroundMode.h"
 #include "..\Misc\MagnetGun.h"
+#include "../Misc/PlayerCelebration.h"
+#include "../Misc/MapEnvironment.h"
 #include "..\Misc\ManualRespawn.h"
 #include "..\Misc\MeteorShower.h"
 #include "..\Misc\RopeGun.h"
@@ -74,6 +89,10 @@
 #include "..\Submenus\PtfxSubs.h"
 #include "..\Submenus\Spooner\SpoonerEntity.h"
 #include "..\Submenus\Spooner\EntityManagement.h"
+#include "..\Submenus\Spooner\Databases.h"
+#include "..\Submenus\Spooner\FileManagement.h"
+#include "..\Submenus\Spooner\SpoonerSettings.h"
+#include "../Submenus/Spooner/MarkerManagement.h"
 #include "..\Submenus\CutscenePlayer.h"
 
 #include <Windows.h>
@@ -153,10 +172,10 @@ void Menu::justopened()
 	addlog(ige::LogType::LOG_DEBUG, "Populate All Paint IDs");
 	sub::PopulateAllPaintIDs();
 
-	g_menuNotOpenedYet = false;
+	menuHasNotOpened = false;
 }
 inline void MenyooMain()
-{	
+{
 	bool firstTick = true;
 	addlog(ige::LogType::LOG_TRACE, "Loading Textures");
 	DxHookIMG::LoadAllMenyooTexturesInit();
@@ -180,6 +199,19 @@ inline void MenyooMain()
 	PopulateGlobalEntityModelsArrays();
 	addlog(ige::LogType::LOG_TRACE, "Populate Cutscene Labels");
 	sub::CutscenePlayer::PopulateCutsceneLabels();
+
+	RegisterBooleanHotkey({ "hide-hud",
+		{ static_cast<unsigned>(BindHideHud), BindHideHudControl, BindHideHudShift, BindHideHudAlt },
+		[] { return hideHUD; },
+		[](bool enabled) { hideHUD = enabled; return true; } });
+	RegisterBooleanHotkey({ "ped-lod",
+		{ static_cast<unsigned>(BindPedLodToggle), BindPedLodToggleControl, BindPedLodToggleShift, BindPedLodToggleAlt },
+		[] { return PedLod::Enabled(); },
+		[](bool enabled) { return PedLod::SetEnabled(enabled); } });
+	RegisterBooleanHotkey({ "display-fps",
+		{ static_cast<unsigned>(BindFpsToggle), BindFpsToggleControl, BindFpsToggleShift, BindFpsToggleAlt },
+		[] { return FPSCounter::bDisplayFps; },
+		[](bool enabled) { FPSCounter::bDisplayFps = enabled; return true; } });
 
 	DWORD tickNow = GetTickCount();
 	srand(tickNow);
@@ -208,19 +240,37 @@ inline void MenyooMain()
 	}
 
 	addlog(ige::LogType::LOG_TRACE, "Creating Tick loop");
+	uint64_t heartbeatFrame = 0;
 	for (;;)
 	{
+		++heartbeatFrame;
+		Http::Heartbeat().Mark("frame-start", heartbeatFrame);
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Textures");
 		DxHookIMG::DxTexture::GlobalDrawOrderRef() = -9999;
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Tick");
+		Http::Heartbeat().Mark("menu", heartbeatFrame);
+		sub::Spooner::FileManagement::TickMapLoadCrashJournal();
+		PlayerCelebration::Tick(ConsumeCelebrationHotkey());
+		if (ConsumeSpoonerMarkersHotkey()) sub::Spooner::MarkerManagement::ToggleVisibility();
+		if (ConsumePreferredMapHotkey()) sub::Spooner::FileManagement::LoadPreferredMap();
+		for (const auto& result : DispatchBooleanHotkeys())
+		{
+			addlog(result.success ? ige::LogType::LOG_INFO : ige::LogType::LOG_ERROR,
+				"Boolean hotkey " + result.actionId + (result.success ? " toggled to " : " rejected; remains ") +
+				(result.enabled ? "on" : "off"));
+		}
 		Menu::Tick();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Load MenyooConfig");
+		Http::Heartbeat().Mark("config", heartbeatFrame);
 		TickMenyooConfig();
+		Http::Heartbeat().Mark("spooner-autosave", heartbeatFrame);
+		TickSpoonerAutoSave();
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - Neonanims");
+		Http::Heartbeat().Mark("effects-and-hotkeys", heartbeatFrame);
 		if (loop_neon_rgb || carColorChange) TickRainbowFader();
 		if (loop_neon_fade == 1)   TickNeonFadeAnim();
 		if (loop_neon_fade == 2)   TickNeonHeartbeatAnim();
@@ -229,6 +279,75 @@ inline void MenyooMain()
 		if (loop_neon_flash == 2 || loop_neon_flash == 3) TickNeonSpinAnim();
 		if (loop_neon_flash == 4)  TickNeonFwkAnim();
 		if (loop_neon_flash == 1)  TickNeonFlashAnim();
+		const bool bikeHotkey = ConsumeSpidermanBikeHotkey();
+		if (bikeHotkey)
+		{
+			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey dispatched; latched chord consumed");
+			const auto result = Http::MakeSpidermanOnBike();
+			addlog(result.status == 201 ? ige::LogType::LOG_INFO : ige::LogType::LOG_ERROR, "Spiderman bike: " + result.body);
+			if (result.status == 201) Game::Print::PrintBottomLeft("SpidermanRed + Bati 801RR: driver ready.");
+			if (result.status != 201)
+			{
+				const auto error = nlohmann::json::parse(result.body, nullptr, false);
+				if (error.is_discarded()) Game::Print::PrintBottomLeft("Spiderman bike: invalid error response; see menyooLog.txt");
+				if (!error.is_discarded()) Game::Print::PrintBottomLeft("Spiderman bike [" + error["stage"].get<std::string>() + "]: " + error["error"].get<std::string>());
+			}
+		}
+		if (!bikeHotkey && IsKeyJustUp(BindBecomePed))
+			BecomeSelectedOrAimedPed();
+		if (IsKeyJustUp(BindCameraPath))
+			sub::Spooner::CameraPaths::ToggleWindow();
+		if (IsKeyJustUp(BindCharacterPicker))
+			sub::Spooner::CharacterPicker::ToggleWindow();
+		// The cursor key serves whichever window is up; the camera window wins
+		// when both are, so its own handling below stays as it was.
+		if (sub::Spooner::CharacterPicker::IsWindowVisible() && !sub::Spooner::CameraPaths::IsWindowVisible() &&
+			IsKeyJustUp(BindCameraPathCursor))
+			sub::Spooner::CharacterPicker::ToggleCursorMode();
+		if (sub::Spooner::CameraPaths::IsWindowVisible())
+		{
+			// Hotkeys so a whole flythrough can be built with the camera in
+			// hand: the mouse is only needed for fine editing.
+			if (IsKeyJustUp(BindCameraPathCursor))
+				sub::Spooner::CameraPaths::ToggleCursorMode();
+			if (IsKeyJustUp(BindCameraPathAddKey))
+			{
+				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
+				sub::Spooner::CameraPaths::State().requestAddKeyAtCamera = true;
+			}
+			// Space is the obvious transport key, but only while the window has
+			// the mouse and nothing is being typed into it.
+			const bool spaceTransport =
+				sub::Spooner::CameraPaths::IsCursorMode() &&
+				!sub::Spooner::ImGuiSpooner::WantsTextInput() &&
+				IsKeyJustUp(VirtualKey::Space);
+
+			if (IsKeyJustUp(BindCameraPathPlay) || spaceTransport)
+			{
+				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
+				auto& state = sub::Spooner::CameraPaths::State();
+				if (state.transport == sub::Spooner::CameraPaths::Transport::Playing)
+					state.requestPause = true;
+				else
+					state.requestPlay = true;
+			}
+			if (IsKeyJustUp(BindCameraPathStop))
+			{
+				std::lock_guard<std::mutex> lock(sub::Spooner::CameraPaths::StateMutex());
+				sub::Spooner::CameraPaths::State().requestStop = true;
+			}
+		}
+		Http::Heartbeat().Mark("ped-lod", heartbeatFrame);
+		PedLod::Tick();
+		Http::Heartbeat().Mark("character-picker", heartbeatFrame);
+		sub::Spooner::CharacterPicker::Tick();
+		Http::Heartbeat().Mark("camera-paths", heartbeatFrame);
+		sub::Spooner::CameraPaths::Tick();
+		Http::Heartbeat().Mark("http-commands", heartbeatFrame);
+		Http::Server::DrainCommands();
+		Http::Heartbeat().Mark("player-controls", heartbeatFrame);
+		Http::PlayerApi::TickControls();
+		Http::Heartbeat().Mark("frame-complete", heartbeatFrame);
 		WAIT(0);
 		if (firstTick)
 			addlog(ige::LogType::LOG_TRACE, "First Tick - looping");
@@ -249,6 +368,9 @@ void ThreadMenyooMain()
 		}, NULL, 0, NULL);
 	}
 
+	addlog(ige::LogType::LOG_TRACE, "Starting HTTP bridge");
+	Http::Server::Start();
+
 	addlog(ige::LogType::LOG_TRACE, "Launching MenyooMain");
 	MenyooMain();
 }
@@ -268,6 +390,56 @@ void TickMenyooConfig()
 		g_MenyooConfigTick = GetTickCount();
 	}
 	firstTick = false;
+}
+
+void TickSpoonerAutoSave()
+{
+	static DWORD lastSave = 0;
+
+	if (GetTickCount() <= lastSave + sub::Spooner::Settings::autoSaveIntervalMs)
+		return;
+
+	lastSave = GetTickCount();
+
+	if (!sub::Spooner::Settings::bAutoSaveDb)
+		return;
+
+	if (sub::Spooner::Databases::EntityDb.empty()
+		&& sub::Spooner::Databases::MarkerDb.empty()
+		&& sub::Spooner::Databases::LightDb.empty())
+		return;
+
+	std::string autoSaveDir = GetPathffA(Pathff::Spooner, false) + "\\AutoSave";
+	CreateDirectoryA(autoSaveDir.c_str(), NULL);
+
+	SYSTEMTIME t;
+	GetLocalTime(&t);
+	char filename[64];
+	snprintf(filename, sizeof(filename), "%04d-%02d-%02dT%02d-%02d-%02d.xml",
+		t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+
+	sub::Spooner::FileManagement::SaveDbToFile(autoSaveDir + "\\" + filename, false);
+
+	WIN32_FIND_DATAA ffd;
+	HANDLE hFind = FindFirstFileA((autoSaveDir + "\\*.xml").c_str(), &ffd);
+	if (hFind != INVALID_HANDLE_VALUE)
+	{
+		std::vector<std::pair<std::string, FILETIME>> files;
+		do {
+			files.emplace_back(ffd.cFileName, ffd.ftLastWriteTime);
+		} while (FindNextFileA(hFind, &ffd));
+		FindClose(hFind);
+
+		const size_t maxFiles = static_cast<size_t>(sub::Spooner::Settings::autoSaveMaxFiles);
+		if (files.size() > maxFiles)
+		{
+			std::sort(files.begin(), files.end(),
+				[](auto& a, auto& b) { return CompareFileTime(&a.second, &b.second) < 0; });
+
+			for (size_t i = 0; i < files.size() - maxFiles; i++)
+				remove((autoSaveDir + "\\" + files[i].first).c_str());
+		}
+	}
 }
 
 void TickRainbowFader()
@@ -502,6 +674,32 @@ void TickNeonFwkAnim()
 // Global state variables
 
 INT16 BindNoClip = VirtualKey::F3;
+INT16 BindCameraPath = VirtualKey::F10;
+INT16 BindCameraPathCursor = VirtualKey::F7;
+// Bracket keys rather than Insert/Home/End: those three are missing from Mac
+// keyboards, which is where this gets used through CrossOver.
+INT16 BindCameraPathAddKey = VirtualKey::OEM6;   // ]
+INT16 BindCameraPathPlay = VirtualKey::OEM4;     // [
+INT16 BindCameraPathStop = VirtualKey::OEM5;     // backslash
+INT16 BindBecomePed = VirtualKey::F6;
+INT16 BindSpidermanBike = VirtualKey::O;
+INT16 BindCharacterPicker = VirtualKey::F5;
+INT16 BindHideHud = VirtualKey::H;
+bool BindHideHudControl = true;
+bool BindHideHudShift = true;
+bool BindHideHudAlt = false;
+INT16 BindPedLodToggle = VirtualKey::L;
+bool BindPedLodToggleControl = true;
+bool BindPedLodToggleShift = true;
+bool BindPedLodToggleAlt = false;
+INT16 BindFpsToggle = VirtualKey::F;
+bool BindFpsToggleControl = true;
+bool BindFpsToggleShift = true;
+bool BindFpsToggleAlt = false;
+INT16 BindPreferredMapLoad = VirtualKey::Q;
+bool BindPreferredMapLoadControl = true;
+bool BindPreferredMapLoadShift = true;
+bool BindPreferredMapLoadAlt = false;
 
 INT16 bind_no_clip = VirtualKey::F3;
 
@@ -520,11 +718,10 @@ Hash kaboomGunHash = EXPLOSION::DIR_WATER_HYDRANT, bullet_gun_hash = WEAPON_FLAR
 GTAmodel::Model pedGunHash = PedHash::KillerWhale, objectGunHash = VEHICLE_BUS;
 FLOAT currentTimescale = 1.0f;
 
-INT g_Ped1;
-INT g_Ped2;
-INT g_Ped3;
-INT g_Ped4;
-const char* g_PlayerName;
+INT g_activePedHandle;
+INT g_activePlayerId;
+INT g_playerGroupId;
+const char* g_playerName;
 
 INT bitMSPaintsRGBMode;
 
@@ -553,7 +750,6 @@ bool bitVehicleGravity = false;
 bool bitFreezeVehicle = false;
 bool bitVehicleSlippyTires = false;
 
-INT msCurrentPaintIndex = 0;
 
 // String variables used in various submenus for search, storage, etc.
 std::string dict;
@@ -798,9 +994,9 @@ void SetPauseMenuTeleToWpCommand()
 		GTAentity myPed = PLAYER_PED_ID();
 		if (IS_WAYPOINT_ACTIVE() && myPed.IsAlive())
 		{
-			(Menu::bitController ? DxHookIMG::teleToWpBoxIconGamepad : DxHookIMG::teleToWpBoxIconKeyboard).Draw(0, Vector2(0.5f, 0.04f), Vector2(0.0943f, 0.016f), 0.0f, RGBA::AllWhite());
+			(Menu::usingControllerInput ? DxHookIMG::teleToWpBoxIconGamepad : DxHookIMG::teleToWpBoxIconKeyboard).Draw(0, Vector2(0.5f, 0.04f), Vector2(0.0943f, 0.016f), 0.0f, RGBA::AllWhite());
 
-			if (Menu::bitController ? IS_DISABLED_CONTROL_JUST_PRESSED(2, INPUT_FRONTEND_RLEFT) : IsKeyJustUp(VirtualKey::T))
+			if (Menu::usingControllerInput ? IS_DISABLED_CONTROL_JUST_PRESSED(2, INPUT_FRONTEND_RLEFT) : IsKeyJustUp(VirtualKey::T))
 			{
 				sub::TeleportLocations_catind::TeleMethods::ToWaypoint(myPed);
 			}
@@ -813,7 +1009,7 @@ void SetPTFXLopTick()
 {
 	using sub::PtfxSubs::fxLoops;
 
-	if (GET_GAME_TIMER() > Menu::delayedTimer)
+	if (GET_GAME_TIMER() > Menu::nextDeferredActionTime)
 	{
 		for (auto it = fxLoops.begin(); it != fxLoops.end();)
 		{
@@ -828,7 +1024,7 @@ void SetPTFXLopTick()
 			case EntityType::PED:
 				if (IS_PED_A_PLAYER(it->entity.Handle()) && it->entity.Handle() != PLAYER_PED_ID())
 				{
-					PTFX::TriggerPTFX(it->asset, it->fx, NULL, GET_PED_BONE_COORDS(it->entity.Handle(), Bone::SKEL_Head, 0.0f, 0.0f, 0.0f), it->entity.Rotation_get(), GET_RANDOM_FLOAT_IN_RANGE(0.76f, 1.4f));
+					PTFX::TriggerPTFX(it->asset, it->fx, NULL, GET_PED_BONE_COORDS(it->entity.Handle(), Bone::SKEL_Head, 0.0f, 0.0f, 0.0f), it->entity.GetRotation(), GET_RANDOM_FLOAT_IN_RANGE(0.76f, 1.4f));
 				}
 				else
 				{
@@ -1189,9 +1385,9 @@ void SetSoulSwitchGun()
 			SET_CONTROL_SHAKE(0, 4000, 210);
 			STOP_CONTROL_SHAKE(0);
 
-			if (g_Ped1 == playerPed.Handle())
+			if (g_activePedHandle == playerPed.Handle())
 			{
-				g_Ped1 = PLAYER_PED_ID();
+				g_activePedHandle = PLAYER_PED_ID();
 			}
 
 			soulSwitchEntity.Handle() = 0;
@@ -1467,7 +1663,7 @@ void SetForgeGunDist(float& distance)
 	DISABLE_CONTROL_ACTION(2, INPUT_LOOK_BEHIND, TRUE);
 	DISABLE_CONTROL_ACTION(2, INPUT_WEAPON_WHEEL_NEXT, TRUE);
 	DISABLE_CONTROL_ACTION(2, INPUT_WEAPON_WHEEL_PREV, TRUE);
-	if (Menu::bitController)
+	if (Menu::usingControllerInput)
 	{
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_FRONTEND_RS)) 
 		{
@@ -1512,7 +1708,7 @@ inline void SetForgeGunRotationHotKeys()
 	Vector3 Rot = GET_ENTITY_ROTATION(targetSlotEntity, 2);
 	FLOAT& precision = g_forgeGunPrecision;
 
-	if (!Menu::bitController)
+	if (!Menu::usingControllerInput)
 	{
 		if (IsKeyDown(VK_OEM_4)) 
 		{
@@ -1714,6 +1910,65 @@ void SetTriggerFXAtBulletHit(Ped ped, const std::string& fxAsset, const std::str
 	PTFX::TriggerPTFX(fxAsset, fxName, 0, Pos, Rot, scale);
 }
 
+// One key for what the menu does in several clicks: look at a ped, press it,
+// be that ped. Free aiming is checked first because it is the precise gesture,
+// then a ray straight out of the camera so merely looking is enough, and only
+// then the spooner's selection for when the camera is pointed elsewhere.
+void BecomeSelectedOrAimedPed()
+{
+	GTAentity target(0);
+	GTAentity myPed = PLAYER_PED_ID();
+
+	ScrHandle aimed;
+	if (GET_ENTITY_PLAYER_IS_FREE_AIMING_AT(PLAYER_ID(), &aimed))
+	{
+		GTAentity aimedEntity = aimed;
+		if (aimedEntity.IsPed())
+			target = aimedEntity;
+	}
+
+	if (!target.Exists())
+	{
+		Camera& spoonerCam = sub::Spooner::SpoonerMode::spoonerModeCamera;
+		const GTAentity looked = spoonerCam.IsActive()
+			? spoonerCam.RaycastForEntity(Vector2(0.0f, 0.0f), myPed, 120.0f)
+			: GameplayCamera::RaycastForEntity(Vector2(0.0f, 0.0f), myPed, 120.0f);
+		if (looked.Exists() && looked.IsPed())
+			target = looked;
+	}
+
+	if (!target.Exists())
+	{
+		const GTAentity& selected = sub::Spooner::selectedEntity.handle;
+		if (selected.Exists() && selected.IsPed())
+			target = selected;
+	}
+
+	if (!target.Exists())
+	{
+		Game::Print::PrintBottomLeft("~r~No ped:~s~ look at one, or select one in the spooner.");
+		return;
+	}
+	if (target == myPed)
+	{
+		Game::Print::PrintBottomLeft("~r~That is already you.");
+		return;
+	}
+	if (!target.IsAlive())
+	{
+		Game::Print::PrintBottomLeft("~r~That ped is dead.");
+		return;
+	}
+	if (NETWORK_IS_IN_SESSION())
+	{
+		Game::Print::PrintBottomLeft("~r~Soul-steal is single player only.");
+		return;
+	}
+
+	SetBecomePed(target);
+	Game::Print::PrintBottomLeft("~g~Became the selected ped.");
+}
+
 void SetBecomePed(GTAped ped)
 {
 	GTAped oldPed = PLAYER_PED_ID();
@@ -1837,7 +2092,7 @@ void SetNoclip()
 
 	if (ent.Exists())
 	{
-		if (Menu::bitController ? (IS_CONTROL_PRESSED(2, INPUT_FRONTEND_X) && IS_CONTROL_JUST_PRESSED(2, INPUT_FRONTEND_LS)) : IsKeyJustUp(BindNoClip))
+		if (Menu::usingControllerInput ? (IS_CONTROL_PRESSED(2, INPUT_FRONTEND_X) && IS_CONTROL_JUST_PRESSED(2, INPUT_FRONTEND_LS)) : IsKeyJustUp(BindNoClip))
 		{
 			noClipToggle = !noClipToggle;
 			if (!noClipToggle)
@@ -1849,7 +2104,7 @@ void SetNoclip()
 				if (bitNoclipShowHelp)
 				{
 					bitNoclipShowHelp = false;
-					if (Menu::bitController)
+					if (Menu::usingControllerInput)
 					{
 						Game::CustomHelpText::ShowTimedText(oss_ << "FreeCam:~n~~INPUT_MOVE_UD~ = " << Game::GetGXTEntry("ITEM_MOV_CAM")
 							<< "~n~~INPUT_LOOK_LR~ = " << Game::GetGXTEntry("ITEM_MOVE") << "~n~~INPUT_FRONTEND_RT~/~INPUT_FRONTEND_LT~ = " << "Ascend/Descend" << "~n~~INPUT_FRONTEND_RB~ = " << "Hasten", 6000);
@@ -1901,7 +2156,7 @@ void SetNoclip()
 		ent.SetVisible(false);
 		myPed.SetVisible(false);
 
-		Vector3 nextRot = cam.GetRotation() - Vector3(GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_UD), 0, GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_LR)) * (Menu::bitController ? 2.5f : 11.0f);
+		Vector3 nextRot = cam.GetRotation() - Vector3(GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_UD), 0, GET_DISABLED_CONTROL_NORMAL(0, INPUT_LOOK_LR)) * (Menu::usingControllerInput ? 2.5f : 11.0f);
 		nextRot.y = 0.0f; // No roll
 		ent.SetRotation(Vector3(0, 0, nextRot.z));
 		cam.SetRotation(nextRot);
@@ -1910,7 +2165,7 @@ void SetNoclip()
 			SET_GAMEPLAY_CAM_RELATIVE_HEADING(0.0f);
 		}
 
-		if (Menu::bitController)
+		if (Menu::usingControllerInput)
 		{
 			DISABLE_CONTROL_ACTION(0, INPUT_VEH_HORN, TRUE);
 
@@ -2073,7 +2328,7 @@ void SetLocalButtonSuperRun()
 
 void SetSelfRefillHealthWhenInCover()
 {
-	if (GET_GAME_TIMER() >= Menu::delayedTimer - 100)
+	if (GET_GAME_TIMER() >= Menu::nextDeferredActionTime - 100)
 	{
 		GTAped playerPed = PLAYER_PED_ID();
 		auto health = playerPed.GetHealth();
@@ -2205,7 +2460,7 @@ void SetPedSupermanAuto(Ped ped)
 		if (ped == PLAYER_PED_ID())
 		{
 			bool isBrakePressed, isBrakeReleased = false;
-			if (Menu::bitController)
+			if (Menu::usingControllerInput)
 			{
 				DISABLE_CONTROL_ACTION(2, INPUT_PARACHUTE_DEPLOY, TRUE);
 				isBrakePressed = IS_CONTROL_PRESSED(2, INPUT_FRONTEND_RDOWN) != 0;
@@ -2261,7 +2516,7 @@ void SetVehicleNosPTFXThisFrame(GTAvehicle vehicle)
 	}
 	else
 	{
-		const Vector3& otherWayRot = vehicle.Rotation_get() + Vector3(0, 0, -90.0f);
+		const Vector3& otherWayRot = vehicle.GetRotation() + Vector3(0, 0, -90.0f);
 		for (auto& exh : { VBone::exhaust, VBone::exhaust_2 })
 		{
 			muzzleFlash.Start(vehicle.GetBoneCoords(vehicle.GetBoneIndex(exh)), 1.0f, otherWayRot);
@@ -2314,7 +2569,7 @@ void SetLocalCarJump()
 			}
 			else
 			{
-				bPressed = Menu::bitController ? IS_CONTROL_JUST_PRESSED(2, INPUT_FRONTEND_RDOWN) : IS_CONTROL_JUST_PRESSED(2, INPUT_VEH_HANDBRAKE);
+				bPressed = Menu::usingControllerInput ? IS_CONTROL_JUST_PRESSED(2, INPUT_FRONTEND_RDOWN) : IS_CONTROL_JUST_PRESSED(2, INPUT_VEH_HANDBRAKE);
 			}
 			if (bPressed)
 			{
@@ -2329,7 +2584,7 @@ void SetLocalCarJump()
 			}
 			else
 			{
-				bPressed = Menu::bitController ? IS_CONTROL_PRESSED(2, INPUT_FRONTEND_RDOWN) : IS_CONTROL_PRESSED(2, INPUT_VEH_HANDBRAKE);
+				bPressed = Menu::usingControllerInput ? IS_CONTROL_PRESSED(2, INPUT_FRONTEND_RDOWN) : IS_CONTROL_PRESSED(2, INPUT_VEH_HANDBRAKE);
 			}
 			if (bPressed)
 			{
@@ -2344,10 +2599,10 @@ void SetLocalCarHydraulics()
 {
 	GTAvehicle vehicle = g_myVeh;
 
-	if ((Menu::bitController ? IS_DISABLED_CONTROL_PRESSED(2, INPUT_FRONTEND_LS) : get_key_pressed(VirtualKey::LeftShift)) && vehicle.IsOnAllWheels())
+	if ((Menu::usingControllerInput ? IS_DISABLED_CONTROL_PRESSED(2, INPUT_FRONTEND_LS) : get_key_pressed(VirtualKey::LeftShift)) && vehicle.IsOnAllWheels())
 	{
 		Vector2 normal;
-		if (Menu::bitController)
+		if (Menu::usingControllerInput)
 		{
 			DISABLE_CONTROL_ACTION(2, INPUT_VEH_HORN, true);
 			normal.x = GET_CONTROL_NORMAL(2, INPUT_SCRIPT_LEFT_AXIS_X);
@@ -2515,7 +2770,7 @@ void DriveOnWater(GTAped ped, Entity& waterobject)
 		SET_ENTITY_COORDS_NO_OFFSET(waterobject, Pos.x, Pos.y, whh, 0, 0, 0);
 		SET_ENTITY_ROTATION(waterobject, 0, 90, 0, 2, 1);
 		FREEZE_ENTITY_POSITION(waterobject, true);
-		Game::Print::PrintBottomCentre("~b~Note:~s~ Enable again if water level is incorrect/changes.");
+		Game::Print::ShowNotification("~b~Note:", "Enable again if water level is incorrect/changes.");
 		WAIT(65);
 		return;
 	}
@@ -2565,7 +2820,7 @@ inline void SetHandlingMultiplier()
 	{
 		return;
 	}
-	if (!Menu::bitController)
+	if (!Menu::usingControllerInput)
 	{
 		if (IS_DISABLED_CONTROL_PRESSED(2, INPUT_SCRIPT_PAD_RIGHT) || IsKeyDown('D'))
 		{
@@ -2615,7 +2870,7 @@ void SetVehicleFlip(GTAvehicle vehicle)
 		if (!vehicle.IsInAir() && !vehicle.IsInWater() && !model.IsPlane() && !model.IsHeli())
 		{
 			vehicle.RequestControlOnce();
-			vehicle.SetRotation(Vector3(0, 0, vehicle.Rotation_get().z));
+			vehicle.SetRotation(Vector3(0, 0, vehicle.GetRotation().z));
 		}
 	}
 }
@@ -2645,7 +2900,7 @@ void SetVehicleRainbowMode(GTAvehicle vehicle, bool useFader)
 void set_vehicle_neon_anim(GTAvehicle vehicle)
 {
 	addlog(ige::LogType::LOG_TRACE, "set_vehicle_neon_anim called");
-	if (g_Ped4 != g_myVeh)
+	if (vehicle != g_myVeh)
 	{
 		loop_neon_fade = 0;
 		loop_neon_flash = 0;
@@ -2854,7 +3109,7 @@ void SetVehicleWeapons()
 		SetVehicleWeaponLines();
 	}
 
-	if (Menu::bitController ? IS_CONTROL_PRESSED(2, INPUT_FRONTEND_LS) : IsKeyDown(VirtualKey::Add))
+	if (Menu::usingControllerInput ? IS_CONTROL_PRESSED(2, INPUT_FRONTEND_LS) : IsKeyDown(VirtualKey::Add))
 	{
 		if (vehicleRPG
 			|| vehicleFireworks
@@ -3142,6 +3397,7 @@ void SetVehicleWheelsInvisible(GTAvehicle vehicle, bool enable)
 		}
 
 		vehicle.RequestControl(800);
+		RESET_VEHICLE_WHEELS(vehicle.Handle(), true);
 		for (UINT i = 0; i <= 8; i++)
 		{
 			vehicle.FixTyre(i);
@@ -3337,11 +3593,11 @@ static void TickWorldState()
 
 	if (!IS_PLAYER_SWITCH_IN_PROGRESS())
 	{
-		if (pauseClock)
+		if (pauseClock && !MapEnvironment::IsActive())
 		{
 			NETWORK_OVERRIDE_CLOCK_TIME(pauseClockH, pauseClockM, 0);
 		}
-		if (syncClock)
+		if (syncClock && !MapEnvironment::IsActive())
 		{
 			SetSyncClockTime();
 		}
@@ -3679,7 +3935,7 @@ static void TickWeaponEffects()
 			SetTripleBullets();
 		}
 	}
-	if (GET_GAME_TIMER() >= Menu::delayedTimer && bulletTime)
+	if (GET_GAME_TIMER() >= Menu::nextDeferredActionTime && bulletTime)
 	{
 		SET_TIME_SCALE(currentTimescale);
 	}
@@ -3914,7 +4170,7 @@ void Menu::loops()
 	// Tick all categories
 	TickWorldState();
 
-	if (GET_GAME_TIMER() >= delayedTimer)
+	if (GET_GAME_TIMER() >= nextDeferredActionTime)
 	{
 		int player = PLAYER_ID();
 		GTAplayer player2;
@@ -3928,6 +4184,8 @@ void Menu::loops()
 
 	// HUD overlays
 	DrawGameInfo();
+	Game::Print::TickPrintBottomCentre();
+	Game::Print::TickNotifications();
 
 	TickVehicleEffects(gameIsPaused);
 	SetPVOpsVehicleTextWorld2Screen();

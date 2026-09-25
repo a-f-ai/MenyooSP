@@ -172,7 +172,7 @@ namespace sub::TeleportLocations_catind
 					Menu::SetPreviousMenu();
 					return;
 				}
-				GTAped ped = g_Ped1;
+				GTAped ped = g_activePedHandle;
 				AddTitle(currentClubhouseInfo.location->name);
 
 				for (auto& o : vOptionArrays)
@@ -189,7 +189,7 @@ namespace sub::TeleportLocations_catind
 					DO_SCREEN_FADE_OUT(50);
 					CreateClubhouse(currentClubhouseInfo);
 					TeleportPedToClubhouse(ped, currentClubhouseInfo);
-					//Menu::SetSub_previous();
+					//Menu::SetPreviousMenu();
 					DO_SCREEN_FADE_IN(200);
 					return;
 				}
@@ -328,7 +328,7 @@ namespace sub::TeleportLocations_catind
 					Menu::SetPreviousMenu();
 					return;
 				}
-				GTAped ped = g_Ped1;
+				GTAped ped = g_activePedHandle;
 				AddTitle(currentBusinessInfo.location->name);
 
 				bool bOption_plus = false, bOption_minus = false;
@@ -342,7 +342,7 @@ namespace sub::TeleportLocations_catind
 					DO_SCREEN_FADE_OUT(50);
 					CreateBusiness(currentBusinessInfo);
 					TeleportPedToBusiness(ped, currentBusinessInfo);
-					//Menu::SetSub_previous();
+					//Menu::SetPreviousMenu();
 					DO_SCREEN_FADE_IN(200);
 					return;
 				}

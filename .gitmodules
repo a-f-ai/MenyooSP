@@ -10,3 +10,6 @@
 [submodule "Solution/external/MinHook"]
 	path = Solution/external/MinHook
 	url = https://github.com/TsudaKageyu/minhook.git
+[submodule "Solution/external/cpp-httplib"]
+	path = Solution/external/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib

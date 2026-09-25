@@ -9,6 +9,10 @@ http://dev-c.com
 * Copyright (C) 2019  MAFINS
 */
 #include "keyboard.h"
+#include "KeyboardChord.h"
+#include "FileLogger.h"
+#include "../Menu/Routine.h"
+#include <mutex>
 
 #include <Windows.h>
 
@@ -30,18 +34,89 @@ struct {
 	BOOL isUpNow;
 } keyStates[KEYS_SIZE];
 
+namespace
+{
+	KeyboardChord bikeChord;
+	KeyboardChord celebrationChord;
+	KeyboardChord spoonerMarkersChord;
+	KeyboardChord preferredMapChord;
+	BooleanHotkeyRegistry booleanHotkeys;
+	std::mutex bikeChordMutex;
+}
+
 
 void OnKeyboardMessage(DWORD key, WORD repeats, BYTE scanCode, BOOL isExtended, BOOL isWithAlt, BOOL wasDownBefore, BOOL isUpNow)
 {
-	if (key < KEYS_SIZE)
 	{
-		keyStates[key].time = GetTickCount();
-		keyStates[key].isWithAlt = isWithAlt;
-		keyStates[key].wasDownBefore = wasDownBefore;
-		keyStates[key].isUpNow = isUpNow;
+		std::lock_guard<std::mutex> lock(bikeChordMutex);
+		const bool booleanHotkeyRelease = booleanHotkeys.Event(key, isUpNow != 0, wasDownBefore != 0);
+		const bool celebrationRelease = key == VirtualKey::J && isUpNow && celebrationChord.Armed();
+		const bool spoonerMarkersRelease = key == VirtualKey::M && isUpNow && spoonerMarkersChord.Armed();
+		const bool preferredMapRelease = key == BindPreferredMapLoad && isUpNow && preferredMapChord.Armed();
+		if (celebrationRelease) ResetKeyState(VirtualKey::J);
+		if (spoonerMarkersRelease) ResetKeyState(VirtualKey::M);
+		if (preferredMapRelease) ResetKeyState(BindPreferredMapLoad);
+		if (booleanHotkeyRelease) ResetKeyState(key);
+		if (key < KEYS_SIZE && !booleanHotkeyRelease && !celebrationRelease && !spoonerMarkersRelease && !preferredMapRelease)
+		{
+			keyStates[key].time = GetTickCount();
+			keyStates[key].isWithAlt = isWithAlt;
+			keyStates[key].wasDownBefore = wasDownBefore;
+			keyStates[key].isUpNow = isUpNow;
+		}
+		const bool armed = bikeChord.Armed();
+		if (key == VirtualKey::F8 || key == menuToggleKey)
+			addlog(ige::LogType::LOG_INFO, "Menu key event: key=" + std::to_string(key) +
+				" up=" + std::to_string(isUpNow != 0) + " repeat=" + std::to_string(wasDownBefore != 0));
+		bikeChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindSpidermanBike);
+		celebrationChord.Event(key, isUpNow != 0, wasDownBefore != 0, VirtualKey::J);
+		spoonerMarkersChord.Event(key, isUpNow != 0, wasDownBefore != 0, VirtualKey::M);
+		preferredMapChord.Event(key, isUpNow != 0, wasDownBefore != 0, BindPreferredMapLoad,
+			BindPreferredMapLoadControl, BindPreferredMapLoadShift, BindPreferredMapLoadAlt);
+		if (key == BindSpidermanBike)
+			addlog(ige::LogType::LOG_INFO, "Spiderman hotkey event: key=" + std::to_string(key) +
+				" up=" + std::to_string(isUpNow != 0) + " ctrl=" + std::to_string(bikeChord.Control()) +
+				" shift=" + std::to_string(bikeChord.Shift()) + " alt=" + std::to_string(bikeChord.Alt()) +
+				" armedBefore=" + std::to_string(armed) + " armedAfter=" + std::to_string(bikeChord.Armed()));
 	}
 }
 
+void RegisterBooleanHotkey(BooleanHotkeyAction action)
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	booleanHotkeys.Register(std::move(action));
+}
+
+std::vector<BooleanHotkeyResult> DispatchBooleanHotkeys()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return booleanHotkeys.DispatchPending();
+}
+
+
+bool ConsumeSpidermanBikeHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return bikeChord.Consume([] { ResetKeyState(BindSpidermanBike); });
+}
+
+bool ConsumeCelebrationHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return celebrationChord.Consume([] { ResetKeyState(VirtualKey::J); });
+}
+
+bool ConsumeSpoonerMarkersHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return spoonerMarkersChord.Consume([] { ResetKeyState(VirtualKey::M); });
+}
+
+bool ConsumePreferredMapHotkey()
+{
+	std::lock_guard<std::mutex> lock(bikeChordMutex);
+	return preferredMapChord.Consume([] { ResetKeyState(BindPreferredMapLoad); });
+}
 
 bool IsKeyDown(DWORD key)
 {
@@ -125,5 +200,3 @@ std::string VkCodeToStr(UINT8 key)
 	case VirtualKey::Space:  return ("Space"); break;
 	}
 }
-
-

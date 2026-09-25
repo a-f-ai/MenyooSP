@@ -20,6 +20,9 @@
 #include "..\..\Util\GTAmath.h"
 #include "..\..\Natives\natives.h"
 #include "Submenus.h"
+#include "CameraPathUI.h"
+#include "CharacterPicker.h"
+#include "CameraPathPlayer.h"
 
 namespace sub::Spooner::ImGuiSpooner
 {
@@ -42,10 +45,8 @@ namespace sub::Spooner::ImGuiSpooner
 		Vector3 camRot{};
 		float   camFov = 50.0f;
 
-		SpoonerMode::eGizmoMode gizmoMode = SpoonerMode::eGizmoMode::Translate; // SpoonerMode::gizmoMode
-		bool gizmoEditModeActive = false;     // entityEditMode == eEntityEditMode::Gizmo
-		bool cameraLocked = false;            // SpoonerMode::bGizmoCameraLocked
-		bool localSpace = false;              // SpoonerMode::bGizmoLocalSpace
+		// SpoonerMode state mirrored here for render-thread access
+		SpoonerMode::EditingState editingState;
 
 		// Render-thread interaction state.
 		bool gizmoOver = false;
@@ -59,6 +60,7 @@ namespace sub::Spooner::ImGuiSpooner
 
 	static std::atomic<bool> g_Visible{ false };
 	static std::atomic<bool> g_ShuttingDown{ false };
+	static std::atomic<bool> g_WantsTextInput{ false };
 	static bool g_ImGuiInitialized = false;
 
 	static void BuildTransformMatrix(const Vector3& pos, const Vector3& rot, const Vector3& scale, float* matrix)
@@ -225,7 +227,7 @@ namespace sub::Spooner::ImGuiSpooner
 		s.gizmoOver = false;
 		s.gizmoUsing = false;
 
-		if (!s.entityValid || !s.gizmoEditModeActive) return;
+		if (!s.entityValid || s.editingState.mode != SpoonerMode::eEditMode::Gizmo) return;
 
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -236,13 +238,13 @@ namespace sub::Spooner::ImGuiSpooner
 		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
 		ImGuizmo::OPERATION op;
-		switch (s.gizmoMode)
+		switch (s.editingState.transformMode)
 		{
-			case SpoonerMode::eGizmoMode::Rotate: op = ImGuizmo::ROTATE; break;
-			case SpoonerMode::eGizmoMode::Scale:  op = ImGuizmo::SCALE;  break;
-			default:                              op = ImGuizmo::TRANSLATE; break;
+			case SpoonerMode::eTransformMode::Rotation: op = ImGuizmo::ROTATE; break;
+			case SpoonerMode::eTransformMode::Scale:    op = ImGuizmo::SCALE;  break;
+			default:                                          op = ImGuizmo::TRANSLATE; break;
 		}
-		ImGuizmo::MODE gizmoMode = s.localSpace ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+		ImGuizmo::MODE gizmoMode = s.editingState.localSpace ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
 
 		if (op == ImGuizmo::TRANSLATE)
 		{
@@ -349,7 +351,7 @@ namespace sub::Spooner::ImGuiSpooner
 
 	static void OnRender(ID3D11Device* device, ID3D11DeviceContext* context, IDXGISwapChain* swapChain)
 	{
-		if (g_ShuttingDown || !g_Visible)
+		if (g_ShuttingDown || (!g_Visible && !CameraPaths::IsWindowVisible() && !CharacterPicker::IsWindowVisible()))
 		{
 			D3D11Hook::SetMenuVisible(false);
 			return;
@@ -388,10 +390,19 @@ namespace sub::Spooner::ImGuiSpooner
 		{
 			std::lock_guard<std::mutex> lock(g_Mutex);
 
-			ImGui::GetIO().MouseDrawCursor = g_Shared.gizmoEditModeActive && g_Shared.cameraLocked;
+			ImGui::GetIO().MouseDrawCursor =
+				(g_Shared.editingState.mode == SpoonerMode::eEditMode::Gizmo && g_Shared.editingState.cameraLocked) ||
+				CameraPaths::IsCursorMode() || CharacterPicker::IsCursorMode();
 
-			RunGizmo_NoLock(g_Shared);
+			if (g_Visible)
+				RunGizmo_NoLock(g_Shared);
 		}
+
+		CameraPathUI::Draw();
+		CharacterPicker::Draw();
+
+		// Published for the script thread, which polls the hotkeys.
+		g_WantsTextInput.store(ImGui::GetIO().WantTextInput, std::memory_order_relaxed);
 
 		ImGui::Render();
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -432,18 +443,20 @@ namespace sub::Spooner::ImGuiSpooner
 		{
 			GTAentity parentEntity(ENTITY::GET_ENTITY_ATTACHED_TO(sel.handle.Handle()));
 
+			// Normal entity (not attached)
 			if (!sel.attachmentArgs.isAttached)
 			{
-				if (s.pending.positionDirty) sel.handle.SetPosition(s.pending.positionVal);
-				if (s.pending.rotationDirty) sel.handle.SetRotation(s.pending.rotationVal);
+				if (s.pending.positionDirty) sel.handle.SetPosition(SpoonerMode::SnapPos(s.pending.positionVal));
+				if (s.pending.rotationDirty) sel.handle.SetRotation(SpoonerMode::SnapRot(s.pending.rotationVal));
 			}
+			// Attached entity - converting to local offsets
 			else if (parentEntity.Exists())
 			{
 				if (s.pending.positionDirty) GetAttachmentOffset(sel, parentEntity, s.pending.positionVal);
 				if (s.pending.rotationDirty)
 				{
 					float oldWorldM[16], newWorldM[16], oldLocalM[16];
-					Vector3 curWorldRot = sel.handle.Rotation_get();
+					Vector3 curWorldRot = sel.handle.GetRotation();
 					BuildTransformMatrix(Vector3(), curWorldRot, Vector3(1.0f, 1.0f, 1.0f), oldWorldM);
 					BuildTransformMatrix(Vector3(), s.pending.rotationVal, Vector3(1.0f, 1.0f, 1.0f), newWorldM);
 					BuildTransformMatrix(Vector3(), sel.attachmentArgs.rotation, Vector3(1.0f, 1.0f, 1.0f), oldLocalM);
@@ -463,6 +476,7 @@ namespace sub::Spooner::ImGuiSpooner
 					sel.handle.AttachTo(parentEntity, sel.attachmentArgs.boneIndex, sel.handle.GetIsCollisionEnabled(), sel.attachmentArgs.offset, sel.attachmentArgs.rotation);
 				}
 			}
+
 			if (s.pending.scaleDirty) {
 				sel.handle.SetScale(s.pending.scaleVal);
 				// syncing scale so that it doesn't reset every time we grab the gizmo
@@ -498,17 +512,16 @@ namespace sub::Spooner::ImGuiSpooner
 			s.camFov   = CAM::GET_GAMEPLAY_CAM_FOV();
 		}
 
-		s.gizmoMode = SpoonerMode::gizmoMode;
+		s.editingState = SpoonerMode::editingState;
 
-		const bool inGizmoNow = SpoonerMode::entityEditMode == SpoonerMode::eEntityEditMode::Gizmo;
+		const bool inGizmoNow = s.editingState.mode == SpoonerMode::eEditMode::Gizmo;
 		static bool s_wasInGizmo = false;
 		if (inGizmoNow && !s_wasInGizmo)
-			SpoonerMode::bGizmoCameraLocked = true;
+		{
+			SpoonerMode::editingState.cameraLocked = true;
+			s.editingState.cameraLocked = true;
+		}
 		s_wasInGizmo = inGizmoNow;
-
-		s.gizmoEditModeActive = inGizmoNow;
-		s.cameraLocked = SpoonerMode::bGizmoCameraLocked;
-		s.localSpace = SpoonerMode::bGizmoLocalSpace;
 
 		SpoonerEntity& sel = selectedEntity;
 		s.entityValid = (sel.handle.Handle() != 0) && sel.handle.Exists();
@@ -521,7 +534,7 @@ namespace sub::Spooner::ImGuiSpooner
 		}
 
 		s.position = sel.handle.GetPosition();
-		s.rotation = sel.handle.Rotation_get();
+		s.rotation = sel.handle.GetRotation();
 		s.scale = sel.handle.GetScale();
 	}
 
@@ -534,10 +547,16 @@ namespace sub::Spooner::ImGuiSpooner
 			RefreshSnapshot_ScriptThread(g_Shared);
 
 			suppressGameInput = g_Visible && (
-				(g_Shared.gizmoEditModeActive && g_Shared.cameraLocked) ||
+				(g_Shared.editingState.mode == SpoonerMode::eEditMode::Gizmo && g_Shared.editingState.cameraLocked) ||
 				g_Shared.gizmoOver ||
 				g_Shared.gizmoUsing);
 		}
+
+		// Only while the window owns the mouse. Suppressing input just because
+		// the window is open takes away camera control, which is exactly what
+		// you need in order to place a key.
+		if (CameraPaths::IsCursorMode() || CharacterPicker::IsCursorMode())
+			suppressGameInput = true;
 
 		if (suppressGameInput)
 			PAD::DISABLE_ALL_CONTROL_ACTIONS(0);
@@ -571,7 +590,17 @@ namespace sub::Spooner::ImGuiSpooner
 	void SetVisible(bool visible)
 	{
 		g_Visible = visible;
-		D3D11Hook::SetMenuVisible(visible);
+		NotifyOverlayChanged();
+	}
+
+	void NotifyOverlayChanged()
+	{
+		D3D11Hook::SetMenuVisible(g_Visible || CameraPaths::IsWindowVisible() || CharacterPicker::IsWindowVisible());
+	}
+
+	bool WantsTextInput()
+	{
+		return g_WantsTextInput.load(std::memory_order_relaxed);
 	}
 
 	bool IsVisible()

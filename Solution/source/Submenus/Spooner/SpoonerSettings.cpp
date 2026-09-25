@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <Windows.h>
 
 namespace sub::Spooner
 {
@@ -36,6 +37,7 @@ namespace sub::Spooner
 		eSpoonerModeMode spoonerModeMode = eSpoonerModeMode::GroundEase;
 
 		bool bShowModelPreviews = true;
+		bool bShowSpoonerMarkers = true;
 		bool bDisplaySpoonerInfo = true;
 		bool bShowBoxAroundSelectedEntity = false;
 		bool bSpawnDynamicProps = false;
@@ -48,13 +50,18 @@ namespace sub::Spooner
 		bool bKeepPositionWhenAttaching = false;
 		
 		bool bTeleportToReferenceWhenLoadingFile = true;
+		bool bClearDbBeforeLoadingFile = false;
+		std::string preferredMapRelativePath;
 
-		bool bGridSnapEnabled = false;
+		bool bGridSnapEnabled = false; // use SnapPos / SnapRot to get the snapped position / rotation Vector3
 		float gridSnapSize = 1.0f;
 		float rotationSnapDegrees = 0.0f;
+		bool bSnapToGround = false; // use SnapPos to get the snapped position Vector3
+		bool bDrawGrid = false;
+
+		bool bAutoSaveDb = false;
+		DWORD autoSaveIntervalMs = 180000;
+		int autoSaveMaxFiles = 10;
 	}
 
 }
-
-
-

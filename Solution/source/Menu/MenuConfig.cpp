@@ -1,4 +1,4 @@
-﻿/*
+/*
 * Menyoo PC - Grand Theft Auto V single-player trainer mod
 * Copyright (C) 2019  MAFINS
 *
@@ -7,6 +7,8 @@
 * the Free Software Foundation, either version 3 of the License, or
 * (at your option) any later version.
 */
+#include "..\Submenus\Spooner\CameraPathPlayer.h"
+#include "..\Misc\PedLod.h"
 #include "MenuConfig.h"
 
 #include "..\macros.h"
@@ -63,7 +65,8 @@ void MenuConfig::ConfigInit()
 	MenuConfig::iniFile.SetUnicode(true);
 	MenuConfig::iniFile.SetMultiKey(false);
 	MenuConfig::iniFile.SetMultiLine(false);
-	SetFileAttributesW(GetPathffW(Pathff::Main, false).c_str(), GetFileAttributes(GetPathffW(Pathff::Main, false).c_str()) & ~FILE_ATTRIBUTE_READONLY);
+	const auto path = GetPathffW(Pathff::Main, false);
+	SetFileAttributesW(path.c_str(), GetFileAttributesW(path.c_str()) & ~FILE_ATTRIBUTE_READONLY);
 
 	if (MenuConfig::iniFile.LoadFile((GetPathffA(Pathff::Main, true) + "menyooConfig.ini").c_str()) < 0)
 		addlog(ige::LogType::LOG_ERROR,  "Failed to load menyooConfig from " + GetPathffA(Pathff::Main, true) + "menyooConfig.ini.");
@@ -83,17 +86,17 @@ void MenuConfig::ConfigRead()
 
 	MenuConfig::bSaveAtIntervals = ini.GetBoolValue(section_settings.c_str(), "sync_with_config_at_intervals", MenuConfig::bSaveAtIntervals);
 	checkSelfDeathModel = ini.GetBoolValue(section_settings.c_str(), "DeathModelReset", checkSelfDeathModel);
-	menubinds = ini.GetLongValue(section_settings.c_str(), "open_key", menubinds);
+	menuToggleKey = ini.GetLongValue(section_settings.c_str(), "open_key", menuToggleKey);
 	menubindsGamepad.first = ini.GetLongValue(section_settings.c_str(), "open_button_for_gamepad_1", menubindsGamepad.first);
 	menubindsGamepad.second = ini.GetLongValue(section_settings.c_str(), "open_button_for_gamepad_2", menubindsGamepad.second);
-	respawnbinds = ini.GetLongValue(section_settings.c_str(), "manual_respawn_button", respawnbinds);
-	stopanimbinds = ini.GetLongValue(section_settings.c_str(), "stop_animation_key", stopanimbinds);
+	respawnKey = ini.GetLongValue(section_settings.c_str(), "manual_respawn_button", respawnKey);
+	stopAnimationKey = ini.GetLongValue(section_settings.c_str(), "stop_animation_key", stopAnimationKey);
 	menuPos.x = ini.GetDoubleValue(section_settings.c_str(), "menuPosX", (menuPos.x + 0.0598f) * 100); menuPos.x = menuPos.x / 100 - 0.0598f;
 	menuPos.y = ini.GetDoubleValue(section_settings.c_str(), "menuPosY", (menuPos.y + 0.074f) * 100); menuPos.y = menuPos.y / 100 - 0.074f;
-	Menu::bit_glare_test = ini.GetBoolValue(section_settings.c_str(), "Titlebox_Globe", Menu::bit_glare_test);
-	Menu::bit_centre_title = ini.GetBoolValue(section_settings.c_str(), "centre_title", Menu::bit_centre_title);
-	Menu::bit_centre_options = ini.GetBoolValue(section_settings.c_str(), "centre_options", Menu::bit_centre_options);
-	Menu::bit_centre_breaks = ini.GetBoolValue(section_settings.c_str(), "centre_breaks", Menu::bit_centre_breaks);
+	Menu::enableGlareEffect = ini.GetBoolValue(section_settings.c_str(), "Titlebox_Globe", Menu::enableGlareEffect);
+	Menu::centerTitleText = ini.GetBoolValue(section_settings.c_str(), "centre_title", Menu::centerTitleText);
+	Menu::centerOptionText = ini.GetBoolValue(section_settings.c_str(), "centre_options", Menu::centerOptionText);
+	Menu::centerBreakText = ini.GetBoolValue(section_settings.c_str(), "centre_breaks", Menu::centerBreakText);
 	Language::configLangName = ini.GetValue(section_settings.c_str(), "language", Language::configLangName.c_str());
 	Language::Init();
 	g_loglevel = ini.GetLongValue(section_settings.c_str(), "log level", g_loglevel);
@@ -103,14 +106,48 @@ void MenuConfig::ConfigRead()
 
 
 	BindNoClip = ini.GetLongValue(section_general.c_str(), "FreeCamButton", BindNoClip);
+	BindCameraPath = ini.GetLongValue(section_general.c_str(), "CameraPathButton", BindCameraPath);
+	BindCameraPathCursor = ini.GetLongValue(section_general.c_str(), "CameraPathCursorButton", BindCameraPathCursor);
+	BindCameraPathAddKey = ini.GetLongValue(section_general.c_str(), "CameraPathAddKeyButton", BindCameraPathAddKey);
+	BindCameraPathPlay = ini.GetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
+	BindCameraPathStop = ini.GetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
+	sub::Spooner::CameraPaths::SetDefaultEasingIndex(ini.GetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex()));
+	BindBecomePed = ini.GetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
+	BindSpidermanBike = ini.GetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
+	if (BindSpidermanBike == 117)
+	{
+		BindSpidermanBike = 79;
+		ini.SetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
+		addlog(ige::LogType::LOG_INFO, "Migrated SpidermanBikeButton from conflicting F6 to Ctrl+Shift+O (79)");
+	}
+	BindCharacterPicker = ini.GetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
+	BindHideHud = ini.GetLongValue(section_general.c_str(), "HideHudToggleKey", BindHideHud);
+	BindHideHudControl = ini.GetBoolValue(section_general.c_str(), "HideHudToggleControl", BindHideHudControl);
+	BindHideHudShift = ini.GetBoolValue(section_general.c_str(), "HideHudToggleShift", BindHideHudShift);
+	BindHideHudAlt = ini.GetBoolValue(section_general.c_str(), "HideHudToggleAlt", BindHideHudAlt);
+	BindPedLodToggle = ini.GetLongValue(section_general.c_str(), "PedLodToggleKey", BindPedLodToggle);
+	BindPedLodToggleControl = ini.GetBoolValue(section_general.c_str(), "PedLodToggleControl", BindPedLodToggleControl);
+	BindPedLodToggleShift = ini.GetBoolValue(section_general.c_str(), "PedLodToggleShift", BindPedLodToggleShift);
+	BindPedLodToggleAlt = ini.GetBoolValue(section_general.c_str(), "PedLodToggleAlt", BindPedLodToggleAlt);
+	BindFpsToggle = ini.GetLongValue(section_general.c_str(), "FpsToggleKey", BindFpsToggle);
+	BindFpsToggleControl = ini.GetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
+	BindFpsToggleShift = ini.GetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
+	BindFpsToggleAlt = ini.GetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
+	BindPreferredMapLoad = ini.GetLongValue(section_general.c_str(), "PreferredMapLoadKey", BindPreferredMapLoad);
+	BindPreferredMapLoadControl = ini.GetBoolValue(section_general.c_str(), "PreferredMapLoadControl", BindPreferredMapLoadControl);
+	BindPreferredMapLoadShift = ini.GetBoolValue(section_general.c_str(), "PreferredMapLoadShift", BindPreferredMapLoadShift);
+	BindPreferredMapLoadAlt = ini.GetBoolValue(section_general.c_str(), "PreferredMapLoadAlt", BindPreferredMapLoadAlt);
+	if (!PedLod::Configure(ini.GetValue(section_general.c_str(), "EnablePedLodOverride", "false"),
+		ini.GetValue(section_general.c_str(), "PedLodMultiplier", "1.0")))
+		addlog(ige::LogType::LOG_ERROR, PedLod::Error());
 
 
 	std::string section_colours = "colours";/////////
 
 
-	Menu::gradients = ini.GetBoolValue(section_colours.c_str(), "gradients", Menu::gradients);
+	Menu::useGradientBackgrounds = ini.GetBoolValue(section_colours.c_str(), "gradients", Menu::useGradientBackgrounds);
 	rainbowBoxes = ini.GetBoolValue(section_colours.c_str(), "rainbow_mode", rainbowBoxes);
-	Menu::thinLineOverScrect = ini.GetBoolValue(section_colours.c_str(), "thin_line_over_footer", Menu::thinLineOverScrect);
+	Menu::drawSeparatorLine = ini.GetBoolValue(section_colours.c_str(), "thin_line_over_footer", Menu::drawSeparatorLine);
 
 	titlebox.R = ini.GetLongValue(section_colours.c_str(), "titlebox_R", titlebox.R);
 	titlebox.G = ini.GetLongValue(section_colours.c_str(), "titlebox_G", titlebox.G);
@@ -180,6 +217,7 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::Settings::cameraMovementSensitivityGamepad = (float)ini.GetDoubleValue(section_spooner.c_str(), "CameraMovementSensitivityGamepad", sub::Spooner::Settings::cameraMovementSensitivityGamepad);
 	sub::Spooner::Settings::cameraRotationSensitivityGamepad = (float)ini.GetDoubleValue(section_spooner.c_str(), "CameraRotationSensitivityGamepad", sub::Spooner::Settings::cameraRotationSensitivityGamepad);
 	sub::Spooner::Settings::bShowModelPreviews = ini.GetBoolValue(section_spooner.c_str(), "ShowModelPreviews", sub::Spooner::Settings::bShowModelPreviews);
+	sub::Spooner::Settings::bShowSpoonerMarkers = ini.GetBoolValue(section_spooner.c_str(), "ShowSpoonerMarkers", sub::Spooner::Settings::bShowSpoonerMarkers);
 	sub::Spooner::Settings::bShowBoxAroundSelectedEntity = ini.GetBoolValue(section_spooner.c_str(), "ShowBoxAroundSelectedEntity", sub::Spooner::Settings::bShowBoxAroundSelectedEntity);
 	sub::Spooner::Settings::bSpawnDynamicProps = ini.GetBoolValue(section_spooner.c_str(), "SpawnDynamicProps", sub::Spooner::Settings::bSpawnDynamicProps);
 	sub::Spooner::Settings::bSpawnDynamicPeds = ini.GetBoolValue(section_spooner.c_str(), "SpawnDynamicPeds", sub::Spooner::Settings::bSpawnDynamicPeds);
@@ -189,9 +227,13 @@ void MenuConfig::ConfigRead()
 	sub::Spooner::Settings::bSpawnStillPeds = ini.GetBoolValue(section_spooner.c_str(), "SpawnStillPeds", sub::Spooner::Settings::bSpawnStillPeds);
 	sub::Spooner::Settings::bAddToDbAsMissionEntities = ini.GetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
+	sub::Spooner::Settings::bClearDbBeforeLoadingFile = ini.GetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
+	sub::Spooner::Settings::preferredMapRelativePath = ini.GetValue(section_spooner.c_str(), "PreferredMap", sub::Spooner::Settings::preferredMapRelativePath.c_str());
 	sub::Spooner::Settings::bKeepPositionWhenAttaching = ini.GetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	sub::Spooner::Settings::spoonerModeMode = (sub::Spooner::eSpoonerModeMode)ini.GetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
-
+	sub::Spooner::Settings::bAutoSaveDb = ini.GetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);
+	sub::Spooner::Settings::autoSaveIntervalMs = (DWORD)ini.GetLongValue(section_spooner.c_str(), "AutoSaveIntervalMs", sub::Spooner::Settings::autoSaveIntervalMs);
+	sub::Spooner::Settings::autoSaveMaxFiles = (int)ini.GetLongValue(section_spooner.c_str(), "AutoSaveMaxFiles", sub::Spooner::Settings::autoSaveMaxFiles);
 
 	std::string section_haxValues = "hax-values";/////////
 
@@ -346,17 +388,17 @@ void MenuConfig::SaveConfig()
 
 	ini.SetBoolValue(section_settings.c_str(), "sync_with_config_at_intervals", MenuConfig::bSaveAtIntervals);
 	ini.SetBoolValue(section_settings.c_str(), "DeathModelReset", checkSelfDeathModel);
-	ini.SetLongValue(section_settings.c_str(), "open_key", menubinds);
+	ini.SetLongValue(section_settings.c_str(), "open_key", menuToggleKey);
 	ini.SetLongValue(section_settings.c_str(), "open_button_for_gamepad_1", menubindsGamepad.first);
 	ini.SetLongValue(section_settings.c_str(), "open_button_for_gamepad_2", menubindsGamepad.second);
-	ini.SetLongValue(section_settings.c_str(), "manual_respawn_button", respawnbinds);
-	ini.SetLongValue(section_settings.c_str(), "stop_animation_key", stopanimbinds);
+	ini.SetLongValue(section_settings.c_str(), "manual_respawn_button", respawnKey);
+	ini.SetLongValue(section_settings.c_str(), "stop_animation_key", stopAnimationKey);
 	ini.SetDoubleValue(section_settings.c_str(), "menuPosX", (menuPos.x + 0.0598f) * 100);
 	ini.SetDoubleValue(section_settings.c_str(), "menuPosY", (menuPos.y + 0.074f) * 100);
-	ini.SetBoolValue(section_settings.c_str(), "Titlebox_Globe", Menu::bit_glare_test);
-	ini.SetBoolValue(section_settings.c_str(), "centre_title", Menu::bit_centre_title);
-	ini.SetBoolValue(section_settings.c_str(), "centre_options", Menu::bit_centre_options);
-	ini.SetBoolValue(section_settings.c_str(), "centre_breaks", Menu::bit_centre_breaks);
+	ini.SetBoolValue(section_settings.c_str(), "Titlebox_Globe", Menu::enableGlareEffect);
+	ini.SetBoolValue(section_settings.c_str(), "centre_title", Menu::centerTitleText);
+	ini.SetBoolValue(section_settings.c_str(), "centre_options", Menu::centerOptionText);
+	ini.SetBoolValue(section_settings.c_str(), "centre_breaks", Menu::centerBreakText);
 	ini.SetValue(section_settings.c_str(), "language", Language::configLangName.c_str());
 	ini.SetLongValue(section_settings.c_str(), "log level", g_loglevel);
 
@@ -365,14 +407,44 @@ void MenuConfig::SaveConfig()
 
 
 	ini.SetLongValue(section_general.c_str(), "FreeCamButton", BindNoClip);
+	ini.SetLongValue(section_general.c_str(), "CameraPathButton", BindCameraPath);
+	ini.SetLongValue(section_general.c_str(), "CameraPathCursorButton", BindCameraPathCursor);
+	ini.SetLongValue(section_general.c_str(), "CameraPathAddKeyButton", BindCameraPathAddKey);
+	ini.SetLongValue(section_general.c_str(), "CameraPathPlayButton", BindCameraPathPlay);
+	ini.SetLongValue(section_general.c_str(), "CameraPathStopButton", BindCameraPathStop);
+	ini.SetLongValue(section_general.c_str(), "CameraPathDefaultEasing", sub::Spooner::CameraPaths::DefaultEasingIndex());
+	ini.SetLongValue(section_general.c_str(), "BecomePedButton", BindBecomePed);
+	ini.SetLongValue(section_general.c_str(), "SpidermanBikeButton", BindSpidermanBike);
+	ini.SetLongValue(section_general.c_str(), "CharacterPickerButton", BindCharacterPicker);
+	if (PedLod::Error()[0] == '\0')
+	{
+		ini.SetBoolValue(section_general.c_str(), "EnablePedLodOverride", PedLod::Enabled());
+		ini.SetDoubleValue(section_general.c_str(), "PedLodMultiplier", PedLod::Multiplier());
+	}
+	ini.SetLongValue(section_general.c_str(), "HideHudToggleKey", BindHideHud);
+	ini.SetBoolValue(section_general.c_str(), "HideHudToggleControl", BindHideHudControl);
+	ini.SetBoolValue(section_general.c_str(), "HideHudToggleShift", BindHideHudShift);
+	ini.SetBoolValue(section_general.c_str(), "HideHudToggleAlt", BindHideHudAlt);
+	ini.SetLongValue(section_general.c_str(), "PedLodToggleKey", BindPedLodToggle);
+	ini.SetBoolValue(section_general.c_str(), "PedLodToggleControl", BindPedLodToggleControl);
+	ini.SetBoolValue(section_general.c_str(), "PedLodToggleShift", BindPedLodToggleShift);
+	ini.SetBoolValue(section_general.c_str(), "PedLodToggleAlt", BindPedLodToggleAlt);
+	ini.SetLongValue(section_general.c_str(), "FpsToggleKey", BindFpsToggle);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleControl", BindFpsToggleControl);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleShift", BindFpsToggleShift);
+	ini.SetBoolValue(section_general.c_str(), "FpsToggleAlt", BindFpsToggleAlt);
+	ini.SetLongValue(section_general.c_str(), "PreferredMapLoadKey", BindPreferredMapLoad);
+	ini.SetBoolValue(section_general.c_str(), "PreferredMapLoadControl", BindPreferredMapLoadControl);
+	ini.SetBoolValue(section_general.c_str(), "PreferredMapLoadShift", BindPreferredMapLoadShift);
+	ini.SetBoolValue(section_general.c_str(), "PreferredMapLoadAlt", BindPreferredMapLoadAlt);
 
 
 	std::string section_colours = "colours";/////////
 
 
-	ini.SetBoolValue(section_colours.c_str(), "gradients", Menu::gradients);
+	ini.SetBoolValue(section_colours.c_str(), "gradients", Menu::useGradientBackgrounds);
 	ini.SetBoolValue(section_colours.c_str(), "rainbow_mode", rainbowBoxes);
-	ini.SetBoolValue(section_colours.c_str(), "thin_line_over_footer", Menu::thinLineOverScrect);
+	ini.SetBoolValue(section_colours.c_str(), "thin_line_over_footer", Menu::drawSeparatorLine);
 
 	ini.SetLongValue(section_colours.c_str(), "titlebox_R", titlebox.R);
 	ini.SetLongValue(section_colours.c_str(), "titlebox_G", titlebox.G);
@@ -441,6 +513,7 @@ void MenuConfig::SaveConfig()
 	ini.SetDoubleValue(section_spooner.c_str(), "CameraMovementSensitivityGamepad", sub::Spooner::Settings::cameraMovementSensitivityGamepad);
 	ini.SetDoubleValue(section_spooner.c_str(), "CameraRotationSensitivityGamepad", sub::Spooner::Settings::cameraRotationSensitivityGamepad);
 	ini.SetBoolValue(section_spooner.c_str(), "ShowModelPreviews", sub::Spooner::Settings::bShowModelPreviews);
+	ini.SetBoolValue(section_spooner.c_str(), "ShowSpoonerMarkers", sub::Spooner::Settings::bShowSpoonerMarkers);
 	ini.SetBoolValue(section_spooner.c_str(), "ShowBoxAroundSelectedEntity", sub::Spooner::Settings::bShowBoxAroundSelectedEntity);
 	ini.SetBoolValue(section_spooner.c_str(), "DisplaySpoonerInfo", sub::Spooner::Settings::bDisplaySpoonerInfo);
 	ini.SetBoolValue(section_spooner.c_str(), "SpawnDynamicProps", sub::Spooner::Settings::bSpawnDynamicProps);
@@ -451,9 +524,13 @@ void MenuConfig::SaveConfig()
 	ini.SetBoolValue(section_spooner.c_str(), "SpawnStillPeds", sub::Spooner::Settings::bSpawnStillPeds);
 	ini.SetBoolValue(section_spooner.c_str(), "AddToDbAsMissionEntities", sub::Spooner::Settings::bAddToDbAsMissionEntities);
 	ini.SetBoolValue(section_spooner.c_str(), "TeleportToReferenceWhenLoadingFile", sub::Spooner::Settings::bTeleportToReferenceWhenLoadingFile);
+	ini.SetBoolValue(section_spooner.c_str(), "ClearDatabaseBeforeLoadingFile", sub::Spooner::Settings::bClearDbBeforeLoadingFile);
+	ini.SetValue(section_spooner.c_str(), "PreferredMap", sub::Spooner::Settings::preferredMapRelativePath.c_str());
 	ini.SetBoolValue(section_spooner.c_str(), "KeepPositionWhenAttaching", sub::Spooner::Settings::bKeepPositionWhenAttaching);
 	ini.SetLongValue(section_spooner.c_str(), "SpoonerModeMethod", (UINT8)sub::Spooner::Settings::spoonerModeMode);
-
+	ini.SetBoolValue(section_spooner.c_str(), "AutoSaveDb", sub::Spooner::Settings::bAutoSaveDb);
+	ini.SetLongValue(section_spooner.c_str(), "AutoSaveIntervalMs", sub::Spooner::Settings::autoSaveIntervalMs);
+	ini.SetLongValue(section_spooner.c_str(), "AutoSaveMaxFiles", sub::Spooner::Settings::autoSaveMaxFiles);
 
 	std::string section_haxValues = "hax-values";/////////
 
@@ -625,5 +702,3 @@ void MenuConfig::ConfigResetHaxValues()
 	MenuConfig::ConfigRead();
 
 }
-
-

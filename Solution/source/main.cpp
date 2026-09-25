@@ -19,6 +19,8 @@ http://dev-c.com
 #include "Menu\Menu.h"
 #include "Menu\MenuConfig.h"
 #include "Submenus/Spooner/ImGuiSpooner.h"
+#include "Http/HttpServer.h"
+#include "Misc/PlayerCelebration.h"
 
 #include <Windows.h>
 #include <Psapi.h>
@@ -75,12 +77,13 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 		break;
 	}
 	case DLL_PROCESS_DETACH:
+		Http::Server::Shutdown();
 		sub::Spooner::ImGuiSpooner::Shutdown();
 		scriptUnregister(hInstance);
+		PlayerCelebration::ResetOnUnload();
 		keyboardHandlerUnregister(OnKeyboardMessage);
 		removeHooks();
 		break;
 	}
 	return TRUE;
 }
-

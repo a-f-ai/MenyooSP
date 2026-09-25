@@ -37,7 +37,7 @@ namespace sub::Spooner
 			pugi::xml_node nodeRoot = doc.child("FavouriteProps");
 			return nodeRoot.find_child_by_attribute("modelName", modelName.c_str()) || nodeRoot.find_child_by_attribute("modelHash", IntToHexString(modelHash == 0 ? GET_HASH_KEY(modelName) : modelHash, true).c_str());
 		}
-		bool AddPropToFavourites(const std::string& modelName, Hash modelHash)
+		bool AddPropToFavourites(const std::string& modelName, Hash modelHash, const std::string& category)
 		{
 			pugi::xml_document doc;
 			if (doc.load_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteProps).c_str()).status != pugi::status_ok)
@@ -45,7 +45,7 @@ namespace sub::Spooner
 				doc.reset();
 				auto nodeDecleration = doc.append_child(pugi::node_declaration);
 				nodeDecleration.append_attribute("version") = "1.0";
-				nodeDecleration.append_attribute("encoding") = "ISO-8859-1";
+				nodeDecleration.append_attribute("encoding") = "UTF-8";
 				auto nodeRoot = doc.append_child("FavouriteProps");
 				doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteProps).c_str());
 			}
@@ -63,7 +63,23 @@ namespace sub::Spooner
 			auto nodeNewLoc = nodeRoot.append_child("PropModel");
 			nodeNewLoc.append_attribute("modelName") = modelName.c_str();
 			nodeNewLoc.append_attribute("modelHash") = IntToHexString(modelHash == 0 ? GET_HASH_KEY(modelName) : modelHash, true).c_str();
+			if (!category.empty())
+				nodeNewLoc.append_attribute("category") = category.c_str();
 			return (doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteProps).c_str()));
+		}
+		bool SetPropCategory(const std::string& modelName, const std::string& category)
+		{
+			pugi::xml_document doc;
+			if (doc.load_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteProps).c_str()).status != pugi::status_ok)
+				return false;
+			pugi::xml_node nodeRoot = doc.child("FavouriteProps");
+			auto node = nodeRoot.find_child_by_attribute("modelName", modelName.c_str());
+			if (!node)
+				return false;
+			node.remove_attribute("category");
+			if (!category.empty())
+				node.append_attribute("category") = category.c_str();
+			return doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteProps).c_str());
 		}
 		bool RemovePropFromFavourites(const std::string& modelName, Hash modelHash)
 		{
@@ -88,6 +104,63 @@ namespace sub::Spooner
 		bool(*IsVehicleAFavourite)(GTAmodel::Model vehModel) = SpawnVehicleIsVehicleModelAFavourite;
 		bool(*AddVehicleToFavourites)(GTAmodel::Model vehModel, const std::string& customName) = SpawnVehicleAddVehicleModelToFavourites;
 		bool(*RemoveVehicleFromFavourites)(GTAmodel::Model vehModel) = SpawnVehicleRemoveVehicleModelFromFavourites;
+
+		std::string xmlFavouriteBlipIcons = "FavouriteBlipIcons.xml";
+
+		void GetFavouriteBlipIcons(std::vector<int>& result)
+		{
+			result.clear();
+			pugi::xml_document doc;
+			if (doc.load_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteBlipIcons).c_str()).status != pugi::status_ok)
+				return;
+			auto nodeRoot = doc.child("FavouriteBlipIcons");
+			for (auto node = nodeRoot.first_child(); node; node = node.next_sibling())
+				result.push_back(node.text().as_int());
+		}
+
+		bool IsBlipIconAFavourite(int icon)
+		{
+			pugi::xml_document doc;
+			if (doc.load_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteBlipIcons).c_str()).status != pugi::status_ok)
+				return false;
+			auto nodeRoot = doc.child("FavouriteBlipIcons");
+			for (auto node = nodeRoot.first_child(); node; node = node.next_sibling())
+				if (node.text().as_int() == icon) return true;
+			return false;
+		}
+
+		bool AddBlipIconToFavourites(int icon)
+		{
+			pugi::xml_document doc;
+			if (doc.load_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteBlipIcons).c_str()).status != pugi::status_ok)
+			{
+				doc.reset();
+				auto nodeDeclaration = doc.append_child(pugi::node_declaration);
+				nodeDeclaration.append_attribute("version") = "1.0";
+				nodeDeclaration.append_attribute("encoding") = "UTF-8";
+				doc.append_child("FavouriteBlipIcons");
+			}
+			auto nodeRoot = doc.child("FavouriteBlipIcons");
+			nodeRoot.append_child("Icon").text() = icon;
+			return doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteBlipIcons).c_str());
+		}
+
+		bool RemoveBlipIconFromFavourites(int icon)
+		{
+			pugi::xml_document doc;
+			if (doc.load_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteBlipIcons).c_str()).status != pugi::status_ok)
+				return false;
+			auto nodeRoot = doc.child("FavouriteBlipIcons");
+			for (auto node = nodeRoot.first_child(); node; node = node.next_sibling())
+			{
+				if (node.text().as_int() == icon)
+				{
+					nodeRoot.remove_child(node);
+					break;
+				}
+			}
+			return doc.save_file((const char*)(GetPathffA(Pathff::Main, true) + xmlFavouriteBlipIcons).c_str());
+		}
 	}
 
 }

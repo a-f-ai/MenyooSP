@@ -301,7 +301,7 @@ namespace sub::TeleportLocations_catind
 				Menu::SetPreviousMenu();
 				return;
 			}
-			GTAped ped = g_Ped1;
+			GTAped ped = g_activePedHandle;
 			AddTitle(currentHangarInfo.location->name);
 
 			for (auto& o : vOptionArrays)
@@ -315,7 +315,7 @@ namespace sub::TeleportLocations_catind
 					if (bOption_pressed)
 					{
 						selectedOptionArray = &o;
-						Menu::SetSub_delayed = SUB::TELEPORTOPS_HANGARS_INOPTION;
+						Menu::pendingSubmenu = SUB::TELEPORTOPS_HANGARS_INOPTION;
 					}
 				}
 			}
@@ -326,7 +326,7 @@ namespace sub::TeleportLocations_catind
 				DO_SCREEN_FADE_OUT(50);
 				CreateHangar(currentHangarInfo);
 				TeleportPedToHangar(ped, currentHangarInfo);
-				//Menu::SetSub_previous();
+				//Menu::SetPreviousMenu();
 				DO_SCREEN_FADE_IN(200);
 				return;
 			}

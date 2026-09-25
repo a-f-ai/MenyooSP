@@ -47,6 +47,7 @@ namespace PTFX
 void ThreadMenyooMain();
 void ThreadMenuLoops2();
 void TickMenyooConfig();
+void TickSpoonerAutoSave();
 void TickRainbowFader();
 void TickNeonFlashAnim();
 void TickNeonFadeAnim();
@@ -57,6 +58,14 @@ void TickNeonFwkAnim();
 void TickNeonHeartbeatAnim();
 
 extern INT16 BindNoClip;
+extern INT16 BindCameraPath;
+extern INT16 BindCameraPathCursor;
+extern INT16 BindCameraPathAddKey;
+extern INT16 BindCameraPathPlay;
+extern INT16 BindCameraPathStop;
+extern INT16 BindBecomePed;
+extern INT16 BindSpidermanBike;
+extern INT16 BindCharacterPicker;
 extern RgbS g_fadedRGB, g_neonFade, g_neonSlide, g_neonHeart, g_neonShift;
 extern bool g_neonFlash;
 extern int g_neonSpin, g_neonSpinBack;
@@ -73,12 +82,11 @@ extern GTAmodel::Model pedGunHash;
 extern GTAmodel::Model objectGunHash;
 extern FLOAT currentTimescale;
 
-extern INT g_Ped1; 
-extern INT g_Ped2;
-extern INT g_Ped3;
-extern INT g_Ped4;
+extern INT g_activePedHandle;
+extern INT g_activePlayerId;
+extern INT g_playerGroupId;
 
-extern const char* g_PlayerName;
+extern const char* g_playerName;
 extern INT bitMSPaintsRGBMode;
 extern bool kaboomGunInvis;
 extern bool kaboomGunRandBit;
@@ -107,7 +115,6 @@ extern bool bitVehicleSlippyTires;
 extern std::array<int, 3> GetHSVFromRGB(int r, int g, int b);
 extern float NormalizeHSV(int h, int s, int v);
 
-extern INT msCurrentPaintIndex;
 
 // String variables used in various submenus for search, storage, etc.
 extern INT16 BindNoClip;
@@ -221,6 +228,22 @@ extern bool carColorChange;
 extern bool vehicleInvisibility;
 extern bool selfEngineOn;
 extern bool hideHUD;
+extern INT16 BindHideHud;
+extern bool BindHideHudControl;
+extern bool BindHideHudShift;
+extern bool BindHideHudAlt;
+extern INT16 BindPedLodToggle;
+extern bool BindPedLodToggleControl;
+extern bool BindPedLodToggleShift;
+extern bool BindPedLodToggleAlt;
+extern INT16 BindFpsToggle;
+extern bool BindFpsToggleControl;
+extern bool BindFpsToggleShift;
+extern bool BindFpsToggleAlt;
+extern INT16 BindPreferredMapLoad;
+extern bool BindPreferredMapLoadControl;
+extern bool BindPreferredMapLoadShift;
+extern bool BindPreferredMapLoadAlt;
 extern bool showFullHUD;
 extern bool pauseClock;
 extern bool syncClock;
@@ -290,6 +313,7 @@ void SetForgeGun();
 void SetExplosionAtBulletHit(Ped ped, Hash type, bool invisible);
 void SetTriggerFXAtBulletHit(Ped ped, const std::string& fxAsset, const std::string& fxName, const Vector3& Rot, float scale);
 void SetBecomePed(GTAped ped);
+void BecomeSelectedOrAimedPed();
 void SetPedInvincibleOn(Ped ped);
 void SetPedInvincibleOff(Ped ped);
 void SetPedNoRagdollOn(Ped ped);

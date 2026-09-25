@@ -19,6 +19,7 @@
 * Copyright (C) 2019  MAFINS
 */
 #include "GTAentity.h"
+#include "../Http/PatternSnapshot.h"
 
 #include "..\macros.h"
 
@@ -388,7 +389,7 @@ void GTAentity::SetPosition(Vector3 value)
 	SET_ENTITY_COORDS_NO_OFFSET(this->mHandle, value.x, value.y, value.z, 1, 1, 1);
 }
 
-Vector3 GTAentity::Rotation_get() const
+Vector3 GTAentity::GetRotation() const
 {
 	return GET_ENTITY_ROTATION(this->mHandle, 2);
 }
@@ -855,6 +856,7 @@ bool GTAentity::RequestControl(DWORD timeOut)
 
 void GTAentity::Delete(bool tele)
 {
+	Http::Pattern::Sources().Remove(this->mHandle);
 	if (!this->Exists()) return;
 
 	this->RequestControl();

@@ -21,6 +21,7 @@ namespace sub::Spooner
 	namespace MarkerManagement
 	{
 		void DrawAll();
+		void ToggleVisibility();
 
 		SpoonerMarker* AddMarker(const std::string& name, const Vector3& position, const Vector3& rotation);
 		SpoonerMarker* AddMarker(const Vector3& position, const Vector3& rotation);
@@ -38,6 +39,5 @@ namespace sub::Spooner
 	}
 
 }
-
 
 

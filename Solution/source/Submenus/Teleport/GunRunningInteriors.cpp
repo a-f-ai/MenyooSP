@@ -168,7 +168,7 @@ namespace sub::TeleportLocations_catind
 					Menu::SetPreviousMenu();
 					return;
 				}
-				GTAped ped = g_Ped1;
+				GTAped ped = g_activePedHandle;
 				AddTitle(currentBunkerInfo.location->name);
 
 				for (auto& o : vOptionArrays)
@@ -185,7 +185,7 @@ namespace sub::TeleportLocations_catind
 					DO_SCREEN_FADE_OUT(50);
 					CreateBunker(currentBunkerInfo);
 					TeleportPedToBunker(ped, currentBunkerInfo);
-					//Menu::SetSub_previous();
+					//Menu::SetPreviousMenu();
 					DO_SCREEN_FADE_IN(200);
 					return;
 				}
@@ -283,7 +283,7 @@ namespace sub::TeleportLocations_catind
 					Menu::SetPreviousMenu();
 					return;
 				}
-				GTAped ped = g_Ped1;
+				GTAped ped = g_activePedHandle;
 				AddTitle(currentMocInfo.location->name);
 
 				for (auto& o : vOptionArrays)
@@ -300,7 +300,7 @@ namespace sub::TeleportLocations_catind
 					DO_SCREEN_FADE_OUT(50);
 					CreateMoc(currentMocInfo);
 					TeleportPedToMoc(ped, currentMocInfo);
-					//Menu::SetSub_previous();
+					//Menu::SetPreviousMenu();
 					DO_SCREEN_FADE_IN(200);
 					return;
 				}

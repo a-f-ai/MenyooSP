@@ -54,6 +54,8 @@ namespace sub
 
 	namespace VehicleAutoDrive
 	{
+		void Start(const Vector3& destination, float speed, int drivingStyle, bool pushEntities);
+		void Stop();
 		void ToggleOnOff();
 		void Tick();
 
@@ -101,6 +103,5 @@ namespace sub
 	}
 
 }
-
 
 

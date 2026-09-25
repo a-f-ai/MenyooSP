@@ -263,7 +263,7 @@ namespace sub::TeleportLocations_catind
 				Menu::SetPreviousMenu();
 				return;
 			}
-			GTAped ped = g_Ped1;
+			GTAped ped = g_activePedHandle;
 
 			AddTitle(currentGarageInfo.location->first);
 
@@ -303,7 +303,7 @@ namespace sub::TeleportLocations_catind
 				DO_SCREEN_FADE_OUT(50);
 				CreateOfficeGarage(currentGarageInfo);
 				TeleportPedToOfficeGarage(ped, currentGarageInfo);
-				//Menu::SetSub_previous();
+				//Menu::SetPreviousMenu();
 				DO_SCREEN_FADE_IN(200);
 				return;
 			}

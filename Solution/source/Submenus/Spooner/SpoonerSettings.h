@@ -11,6 +11,7 @@
 
 #include <string>
 #include <vector>
+#include <Windows.h>
 
 typedef unsigned char UINT8;
 
@@ -31,6 +32,7 @@ namespace sub::Spooner
 		extern eSpoonerModeMode spoonerModeMode;
 
 		extern bool bShowModelPreviews;
+		extern bool bShowSpoonerMarkers;
 		extern bool bDisplaySpoonerInfo;
 		extern bool bShowBoxAroundSelectedEntity;
 		extern bool bSpawnDynamicProps;
@@ -43,13 +45,22 @@ namespace sub::Spooner
 		extern bool bKeepPositionWhenAttaching;
 
 		extern bool bTeleportToReferenceWhenLoadingFile;
+		// Loading a map adds to whatever is already spawned, so two maps in a
+		// row pile up unless the database is emptied first. Off by default,
+		// because a map that expects to be layered on top of another is a
+		// legitimate thing to build.
+		extern bool bClearDbBeforeLoadingFile;
+		extern std::string preferredMapRelativePath;
 
 		extern bool bGridSnapEnabled;
 		extern float gridSnapSize;
 		extern float rotationSnapDegrees;
+		extern bool bSnapToGround;
+		extern bool bDrawGrid;
+
+		extern bool bAutoSaveDb;
+		extern DWORD autoSaveIntervalMs;
+		extern int autoSaveMaxFiles;
 	}
 
 }
-
-
-
