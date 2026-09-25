@@ -372,25 +372,22 @@ namespace sub::Spooner
 					nodePedStuff.append_child("ScenarioActive").text() = false;
 				}
 
+				bool savedAnimation = false;
 				if (!(bEntTaskSequenceIsActive && e.taskSequence.ContainsType(STSTaskType::PlayAnimation)))
 				{
-					auto nodeAnimations = nodePedStuff.append_child("Animations");
-					for (const auto& anim : e.lastAnimations)
+					for (auto anim = e.lastAnimations.rbegin(); anim != e.lastAnimations.rend(); ++anim)
 					{
-						if (IS_ENTITY_PLAYING_ANIM(ep.Handle(), anim.dict.c_str(), anim.name.c_str(), 3))
-						{
-							auto nodeAnim = nodeAnimations.append_child("Animation");
-							nodeAnim.append_child("Dict").text() = anim.dict.c_str();
-							nodeAnim.append_child("Name").text() = anim.name.c_str();
-							nodeAnim.append_child("Speed").text() = anim.speed;
-							nodeAnim.append_child("SpeedMultiplier").text() = anim.speedMultiplier;
-							nodeAnim.append_child("PlaybackRate").text() = anim.playbackRate;
-							nodeAnim.append_child("Duration").text() = anim.duration;
-							nodeAnim.append_child("Flag").text() = anim.flag;
-							nodeAnim.append_child("LockPos").text() = anim.lockPos;
-						}
+						if (!IS_ENTITY_PLAYING_ANIM(ep.Handle(), anim->dict.c_str(), anim->name.c_str(), 3))
+							continue;
+						nodePedStuff.append_child("AnimActive").text() = true;
+						nodePedStuff.append_child("AnimDict").text() = anim->dict.c_str();
+						nodePedStuff.append_child("AnimName").text() = anim->name.c_str();
+						savedAnimation = true;
+						break;
 					}
 				}
+				if (!savedAnimation)
+					nodePedStuff.append_child("AnimActive").text() = false;
 
 				const auto& facialMoodStr = GetPedFacialMood(ep);
 				if (!facialMoodStr.empty())
