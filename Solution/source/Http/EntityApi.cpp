@@ -248,6 +248,11 @@ namespace Http::EntityApi
 				return false;
 			}
 
+			addlog(ige::LogType::LOG_INFO, "spawned handle " +
+				std::to_string(out.handle.GetHandle()) + " entityAddress " +
+				std::to_string(out.handle.MemoryAddress()) + " modelAddress " +
+				std::to_string(model.MemoryAddress()));
+
 			out.type = type;
 			out.dynamic = request.dynamic;
 			out.hashName = request.name.empty()
