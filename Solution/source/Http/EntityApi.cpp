@@ -440,7 +440,7 @@ namespace Http::EntityApi
 		std::unordered_set<Hash> usable;
 		const json rejectedModels = PreloadModels(requests, usable);
 
-		json created = json::array();
+		json createdIds = json::array();
 		json failures = json::array();
 
 		for (size_t index = 0; index < requests.size(); ++index)
@@ -468,7 +468,7 @@ namespace Http::EntityApi
 			if (Spawn(request, spawned, failure))
 			{
 				PinModel(spawned.handle.GetHandle(), hash);
-				created.push_back(Describe(spawned));
+				createdIds.push_back(spawned.handle.GetHandle());
 			}
 			else
 				failures.push_back(json{ { "index", index }, { "model", label }, { "error", failure } });
@@ -485,9 +485,9 @@ namespace Http::EntityApi
 		const int status = failures.empty() ? 201 : 207;
 		return Response{ status, Serialise(json{
 			{ "requested", requests.size() },
-			{ "created", created.size() },
+			{ "created", createdIds.size() },
 			{ "failed", failures.size() },
-			{ "entities", std::move(created) },
+			{ "entityIds", std::move(createdIds) },
 			{ "failures", std::move(failures) },
 		}) };
 	}

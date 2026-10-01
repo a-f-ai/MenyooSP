@@ -517,7 +517,7 @@ namespace Http::Server
 					"       textureVariation (props): the tint index that colours stunt blocks and tubes - the author's maps use 0..16 on bkr_prop_biker_bblock_*; entity listings report it",
 					"       expectedSupportZ: the surface z you believe is under the entity; the spawn refuses (with the z it found) if the real surface is further than tolerance (0.25)",
 					"POST   /entities/settle     {name?|type?, frames?=90, epsilon?=0.1} waits, then lists what moved - a measurement, nothing is corrected",
-					"POST   /entities/batch      {items:[ <the same object>, ... ]} up to 400, one shared model load, 207 when some fail",
+					"POST   /entities/batch      {items:[ <the same object>, ... ]} up to 400, one shared model load; returns counts, entityIds and explicit failures",
 					"GET    /entities/{id}",
 					"PATCH  /entities/{id}       {position?, rotation?, snapToGround?, scenario?, animDict?, animName?}",
 					"DELETE /entities/{id}",
