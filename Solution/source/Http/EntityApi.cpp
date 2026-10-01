@@ -41,6 +41,7 @@ namespace Http::EntityApi
 	namespace
 	{
 		constexpr DWORD kModelLoadTimeoutMs = 4000;
+		constexpr ULONGLONG kBatchModelStallTimeoutMs = 30000;
 		constexpr int kDefaultListLimit = 200;
 		// A standing ped's origin sits this far above the surface. Measured on 686
 		// of the author's peds standing on box-shaped props (tools/calibrate_stand_offsets.py):
@@ -277,23 +278,29 @@ namespace Http::EntityApi
 				model.Load();
 			}
 
-			const DWORD batchLoadTimeoutMs = static_cast<DWORD>(
-				std::min<size_t>(180000, 5000 + wanted.size() * 1000));
-			const DWORD deadline = GetTickCount() + batchLoadTimeoutMs;
+			size_t loadedCount = 0;
+			ULONGLONG progressDeadline = GetTickCount64() + kBatchModelStallTimeoutMs;
 			for (;;)
 			{
-				bool allReady = true;
+				size_t ready = 0;
 				for (Hash hash : wanted)
 				{
 					if (rejected.contains(IntToHexString(hash, true)))
-						continue;
-					if (!Model(hash).IsLoaded())
 					{
-						allReady = false;
-						break;
+						ready++;
+						continue;
 					}
+					if (Model(hash).IsLoaded())
+						ready++;
 				}
-				if (allReady || GetTickCount() > deadline)
+				if (ready == wanted.size())
+					break;
+				if (ready > loadedCount)
+				{
+					loadedCount = ready;
+					progressDeadline = GetTickCount64() + kBatchModelStallTimeoutMs;
+				}
+				if (GetTickCount64() > progressDeadline)
 					break;
 				WAIT(0);
 			}
@@ -306,8 +313,8 @@ namespace Http::EntityApi
 				if (Model(hash).IsLoaded())
 					usable.insert(hash);
 				else
-					rejected[key] = "model did not stream in within " +
-						std::to_string(batchLoadTimeoutMs) + "ms";
+					rejected[key] = "model streaming made no progress for " +
+						std::to_string(kBatchModelStallTimeoutMs) + "ms";
 			}
 
 			return rejected;
