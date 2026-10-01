@@ -277,7 +277,9 @@ namespace Http::EntityApi
 				model.Load();
 			}
 
-			const DWORD deadline = GetTickCount() + kModelLoadTimeoutMs;
+			const DWORD batchLoadTimeoutMs = static_cast<DWORD>(
+				std::min<size_t>(180000, 5000 + wanted.size() * 1000));
+			const DWORD deadline = GetTickCount() + batchLoadTimeoutMs;
 			for (;;)
 			{
 				bool allReady = true;
@@ -305,7 +307,7 @@ namespace Http::EntityApi
 					usable.insert(hash);
 				else
 					rejected[key] = "model did not stream in within " +
-						std::to_string(kModelLoadTimeoutMs) + "ms";
+						std::to_string(batchLoadTimeoutMs) + "ms";
 			}
 
 			return rejected;

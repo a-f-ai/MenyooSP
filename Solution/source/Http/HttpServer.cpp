@@ -666,7 +666,7 @@ namespace Http::Server
 					// A batch spans frames by design, so its deadline grows with
 					// the work rather than sharing the single-command one.
 					timeout = std::chrono::milliseconds(
-						std::min<long long>(60000, 5000 + 120LL * static_cast<long long>(creates.size())));
+						std::min<long long>(180000, 10000 + 1200LL * static_cast<long long>(creates.size())));
 
 					const Response result = Queue().Submit(
 						[creates] { return EntityApi::CreateBatch(creates); }, timeout);
