@@ -27,7 +27,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -48,6 +50,33 @@ namespace Http::EntityApi
 		// 0.998 m, p10-p90 within a centimetre. The model box says 1.30, but that is
 		// the capsule bottom, not the feet.
 		constexpr float kPedStandHeight = 1.0f;
+		std::unordered_map<int, Hash> pinnedEntityModels;
+		std::unordered_map<Hash, size_t> pinnedModelCounts;
+
+		void PinModel(int id, Hash hash)
+		{
+			const auto inserted = pinnedEntityModels.emplace(id, hash);
+			if (!inserted.second)
+				throw std::logic_error("entity model is already pinned");
+			pinnedModelCounts[hash]++;
+		}
+
+		void ReleaseModel(int id)
+		{
+			const auto entity = pinnedEntityModels.find(id);
+			if (entity == pinnedEntityModels.end())
+				return;
+			const Hash hash = entity->second;
+			pinnedEntityModels.erase(entity);
+			const auto count = pinnedModelCounts.find(hash);
+			if (count == pinnedModelCounts.end() || count->second == 0)
+				throw std::logic_error("pinned model count is inconsistent");
+			count->second--;
+			if (count->second != 0)
+				return;
+			pinnedModelCounts.erase(count);
+			Model(hash).Unload();
+		}
 
 		std::string Serialise(const json& payload)
 		{
@@ -391,10 +420,13 @@ namespace Http::EntityApi
 		SpoonerEntity spawned;
 		std::string failure;
 		const bool created = Spawn(request, spawned, failure);
-		model.Unload();
 
 		if (!created)
+		{
+			model.Unload();
 			return Fail(422, failure);
+		}
+		PinModel(spawned.handle.GetHandle(), static_cast<Hash>(request.model));
 		return Response{ 201, Serialise(Describe(spawned)) };
 	}
 
@@ -429,7 +461,10 @@ namespace Http::EntityApi
 			SpoonerEntity spawned;
 			std::string failure;
 			if (Spawn(request, spawned, failure))
+			{
+				PinModel(spawned.handle.GetHandle(), hash);
 				created.push_back(Describe(spawned));
+			}
 			else
 				failures.push_back(json{ { "index", index }, { "model", label }, { "error", failure } });
 
@@ -439,7 +474,8 @@ namespace Http::EntityApi
 		}
 
 		for (Hash hash : usable)
-			Model(hash).Unload();
+			if (!pinnedModelCounts.count(hash))
+				Model(hash).Unload();
 
 		const int status = failures.empty() ? 201 : 207;
 		return Response{ status, Serialise(json{
@@ -508,6 +544,7 @@ namespace Http::EntityApi
 			return Fail(404, "no entity with id " + std::to_string(id));
 
 		sub::Spooner::EntityManagement::DeleteEntity(*entity);
+		ReleaseModel(id);
 		return Ok(json{ { "deleted", json::array({ id }) }, { "count", 1 } });
 	}
 
@@ -575,6 +612,7 @@ namespace Http::EntityApi
 			if (entity == nullptr)
 				continue;
 			sub::Spooner::EntityManagement::DeleteEntity(*entity);
+			ReleaseModel(id);
 			deleted.push_back(id);
 		}
 
