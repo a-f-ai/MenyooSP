@@ -248,6 +248,9 @@ namespace Http::EntityApi
 				return false;
 			}
 
+			if (type == EntityType::PED)
+				SET_PED_DEFAULT_COMPONENT_VARIATION(out.handle.Handle());
+
 			addlog(ige::LogType::LOG_INFO, "spawned handle " +
 				std::to_string(out.handle.GetHandle()) + " entityAddress " +
 				std::to_string(out.handle.MemoryAddress()) + " modelAddress " +
